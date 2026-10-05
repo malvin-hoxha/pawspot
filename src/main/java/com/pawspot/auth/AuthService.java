@@ -3,6 +3,7 @@ package com.pawspot.auth;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.pawspot.exception.InvalidCredentialsException;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
@@ -29,5 +30,15 @@ public class AuthService {
         );
 
         return userRepository.save(user);
+    }
+
+    public User login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        
+        if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) 
+            throw new InvalidCredentialsException("Invalid email or password");
+
+        return user;
     }
 }
