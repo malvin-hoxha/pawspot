@@ -49,7 +49,7 @@ public class AuthService {
             user.getName(),
             user.getEmail(),
             user.getCreatedAt()
-    );
+        );
 
         return new AuthResponse(accessToken, userResponse);
     }

@@ -1,5 +1,8 @@
 package com.pawspot.post;
 
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,6 +40,15 @@ public class PetPostService {
         post.setUser(user);
 
         return petPostRepository.save(post);
+    }
+
+    public List<PetPost> getPosts() {
+        return petPostRepository.findAll();
+    }
+
+    public PetPost getPost(Long id) {
+        return petPostRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Post not found"));
     }
 
 }
