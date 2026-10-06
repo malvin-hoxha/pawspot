@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 
 
@@ -26,7 +27,7 @@ public class PetPostController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<PetPostResponse> createPost(@Valid @RequestPart("post") CreatePetPostRequest request,
+    public ResponseEntity<PetPostResponse> createPost(@Valid @ModelAttribute CreatePetPostRequest request,
         @RequestPart("image") MultipartFile image,
         Authentication authentication)
     {

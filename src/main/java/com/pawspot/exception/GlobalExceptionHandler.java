@@ -28,4 +28,15 @@ public class GlobalExceptionHandler {
                     "message", ex.getMessage()
                 ));
     }
+
+    @ExceptionHandler(ImageValidationException.class)
+    public ResponseEntity<Map<String, String>> handleImageValidation(
+        ImageValidationException ex
+    ) {
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(Map.of(
+                    "message", ex.getMessage()
+            ));
+    }
 }

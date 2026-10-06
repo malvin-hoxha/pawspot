@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.pawspot.exception.ImageUploadException;
+import com.pawspot.exception.ImageValidationException;
 
 import java.io.IOException;
 
@@ -23,25 +24,22 @@ public class CloudinaryService {
     public ImageUploadResult upload(MultipartFile image) {
 
         if (image == null || image.isEmpty()) {
-            throw new ImageUploadException(
-                "Image is required",
-                null
+            throw new ImageValidationException(
+                "Image is required"
             );
         }
 
         if (image.getContentType() == null || !image.getContentType().startsWith("image/")) {
-            throw new ImageUploadException(
-                "File must be an image",
-                null
+            throw new ImageValidationException(
+                "File must be an image"
             );
         }
 
         long maxSize = 5 * 1024 * 1024;
 
         if (image.getSize() > maxSize) {
-            throw new ImageUploadException(
-                "Image must be smaller than 5 MB",
-                null
+            throw new ImageValidationException(
+                "Image must be smaller than 5 MB"
             );
         }
         
