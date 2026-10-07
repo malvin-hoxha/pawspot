@@ -12,8 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pawspot.user.User;
 
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.RequestParam;
-
 
 @RestController
 @RequestMapping("/api/auth")

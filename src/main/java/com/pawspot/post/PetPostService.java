@@ -1,11 +1,11 @@
 package com.pawspot.post;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.pawspot.exception.PostNotFoundException;
 import com.pawspot.image.CloudinaryService;
 import com.pawspot.image.ImageUploadResult;
 import com.pawspot.user.User;
@@ -48,7 +48,7 @@ public class PetPostService {
 
     public PetPost getPost(Long id) {
         return petPostRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Post not found"));
+            .orElseThrow(() -> new PostNotFoundException("Post not found"));
     }
 
 }
