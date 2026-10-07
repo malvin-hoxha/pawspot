@@ -1,10 +1,13 @@
 package com.pawspot.post;
 
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.pawspot.common.PageResponse;
+import com.pawspot.post.enums.PostType;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
@@ -15,6 +18,7 @@ import jakarta.validation.Valid;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -54,10 +58,14 @@ public class PetPostController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PetPostResponse>> getPosts() {
-        List<PetPost> posts = petPostService.getPosts();
-        List<PetPostResponse> response = posts.stream()
-            .map(petPostMapper::toResponse).toList();
+    public ResponseEntity<PageResponse<PetPostResponse>> getPosts(
+        @RequestParam(required = false) PostType type,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<PetPost> posts = petPostService.getPosts(type, page, size);
+        PageResponse<PetPostResponse> response = petPostMapper.toPageResponse(posts);
+
         return ResponseEntity.ok(response);
     }
 
