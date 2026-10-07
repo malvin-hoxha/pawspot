@@ -1,6 +1,9 @@
 package com.pawspot.post;
 import java.time.LocalDateTime;
 
+import com.pawspot.post.enums.PetSpecies;
+import com.pawspot.post.enums.PostStatus;
+import com.pawspot.post.enums.PostType;
 import com.pawspot.user.User;
 
 import jakarta.persistence.Column;

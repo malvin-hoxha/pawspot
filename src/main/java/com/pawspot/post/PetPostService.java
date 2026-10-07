@@ -7,8 +7,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.pawspot.exception.ForbiddenOperationException;
 import com.pawspot.exception.PostNotFoundException;
+import com.pawspot.exception.validation.PostValidationException;
 import com.pawspot.image.CloudinaryService;
 import com.pawspot.image.ImageUploadResult;
+import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.user.User;
@@ -17,11 +19,15 @@ import com.pawspot.user.User;
 public class PetPostService {
     private final PetPostRepository petPostRepository;
     private final CloudinaryService cloudinaryService;
+    private final PetPostMapper petPostMapper;
 
 
-    public PetPostService(PetPostRepository petPostRepository, CloudinaryService cloudinaryService) {
+    public PetPostService(PetPostRepository petPostRepository, CloudinaryService cloudinaryService,
+        PetPostMapper petPostMapper
+    ) {
         this.petPostRepository = petPostRepository;
         this.cloudinaryService = cloudinaryService;
+        this.petPostMapper = petPostMapper;
     }
 
     public PetPost createPost(CreatePetPostRequest request, MultipartFile image, User user) {
@@ -67,33 +73,13 @@ public class PetPostService {
             throw new ForbiddenOperationException("You cannot update this post");
         }
 
-        if (request.getType() != null) {
-            post.setType(request.getType());
+        if (!request.hasUpdates()) {
+            throw new PostValidationException(
+                "At least one field must be provided"
+            );
         }
 
-        if (request.getTitle() != null) {
-            post.setTitle(request.getTitle());
-        }
-
-        if (request.getDescription() != null) {
-            post.setDescription(request.getDescription());
-        }
-
-        if (request.getSpecies() != null) {
-            post.setSpecies(request.getSpecies());
-        }
-
-        if (request.getCity() != null) {
-            post.setCity(request.getCity());
-        }
-
-        if (request.getArea() != null) {
-            post.setArea(request.getArea());
-        }
-
-        if (request.getStatus() != null) {
-            post.setStatus(request.getStatus());
-        }
+        petPostMapper.updatePostFromRequest(request, post);
 
         return petPostRepository.save(post);
     }
@@ -110,9 +96,10 @@ public class PetPostService {
             );
         }
 
-        cloudinaryService.delete((post.getImagePublicId()));
+        cloudinaryService.delete(post.getImagePublicId());
 
         petPostRepository.delete(post);
     }
+    
 
 }

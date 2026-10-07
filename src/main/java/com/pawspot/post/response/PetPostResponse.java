@@ -2,9 +2,9 @@ package com.pawspot.post.response;
 
 import java.time.LocalDateTime;
 
-import com.pawspot.post.PetSpecies;
-import com.pawspot.post.PostStatus;
-import com.pawspot.post.PostType;
+import com.pawspot.post.enums.PetSpecies;
+import com.pawspot.post.enums.PostStatus;
+import com.pawspot.post.enums.PostType;
 
 public class PetPostResponse {
     private Long id;

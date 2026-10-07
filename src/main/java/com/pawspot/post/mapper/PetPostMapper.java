@@ -1,25 +1,27 @@
 package com.pawspot.post.mapper;
 
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+
 import com.pawspot.post.PetPost;
+import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.post.response.PetPostResponse;
 
-public class PetPostMapper {
+@Mapper(componentModel = "spring")
+public interface PetPostMapper {
 
-    public static PetPostResponse toResponse(PetPost post) {
-        return new PetPostResponse(
-            post.getId(),
-            post.getType(),
-            post.getTitle(),
-            post.getDescription(),
-            post.getSpecies(),
-            post.getCity(),
-            post.getArea(),
-            post.getStatus(),
-            post.getImageUrl(),
-            post.getCreatedAt(),
-            post.getUpdatedAt(),
-            post.getUser().getId(),
-            post.getUser().getName()
-        );
-    }
+    @Mapping(source = "user.id", target = "userId")
+    @Mapping(source = "user.name", target = "userName")
+    PetPostResponse toResponse(PetPost post);
+
+    @BeanMapping(
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+    )
+    void updatePostFromRequest(
+        UpdatePetPostRequest request,
+        @MappingTarget PetPost post
+    );
 }

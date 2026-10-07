@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.pawspot.auth.request.LoginRequest;
+import com.pawspot.auth.request.RegisterRequest;
+import com.pawspot.auth.response.AuthResponse;
+import com.pawspot.auth.response.UserResponse;
 import com.pawspot.user.User;
 
 import jakarta.validation.Valid;

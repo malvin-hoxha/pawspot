@@ -7,8 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import com.pawspot.exception.ImageUploadException;
-import com.pawspot.exception.ImageValidationException;
+import com.pawspot.exception.image.ImageUploadException;
+import com.pawspot.exception.image.ImageValidationException;
 
 import java.io.IOException;
 

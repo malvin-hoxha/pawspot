@@ -1,7 +1,7 @@
 package com.pawspot.post.request;
 
-import com.pawspot.post.PetSpecies;
-import com.pawspot.post.PostType;
+import com.pawspot.post.enums.PetSpecies;
+import com.pawspot.post.enums.PostType;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

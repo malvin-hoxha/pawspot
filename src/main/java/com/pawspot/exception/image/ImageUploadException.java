@@ -1,4 +1,4 @@
-package com.pawspot.exception;
+package com.pawspot.exception.image;
 
 public class ImageUploadException extends RuntimeException {
 

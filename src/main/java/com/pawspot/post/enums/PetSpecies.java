@@ -1,4 +1,4 @@
-package com.pawspot.post;
+package com.pawspot.post.enums;
 
 public enum PetSpecies {
     CAT,

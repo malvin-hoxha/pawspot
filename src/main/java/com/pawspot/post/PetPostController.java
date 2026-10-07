@@ -32,9 +32,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 @RequestMapping("/api/posts")
 public class PetPostController {
     private final PetPostService petPostService;
+    private final PetPostMapper petPostMapper;
 
-    public PetPostController(PetPostService petPostService) {
+    public PetPostController(PetPostService petPostService, PetPostMapper petPostMapper) {
         this.petPostService = petPostService;
+        this.petPostMapper = petPostMapper;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -46,7 +48,7 @@ public class PetPostController {
 
         PetPost post = petPostService.createPost(request, image, user);
 
-        PetPostResponse response = PetPostMapper.toResponse(post);
+        PetPostResponse response = petPostMapper.toResponse(post);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -55,14 +57,14 @@ public class PetPostController {
     public ResponseEntity<List<PetPostResponse>> getPosts() {
         List<PetPost> posts = petPostService.getPosts();
         List<PetPostResponse> response = posts.stream()
-            .map(PetPostMapper::toResponse).toList();
+            .map(petPostMapper::toResponse).toList();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PetPostResponse> getPost(@PathVariable Long id) {
         PetPost post = petPostService.getPost(id);
-        PetPostResponse response = PetPostMapper.toResponse(post);
+        PetPostResponse response = petPostMapper.toResponse(post);
         return ResponseEntity.ok(response);
     }
 
@@ -74,14 +76,14 @@ public class PetPostController {
         List<PetPost> posts = petPostService.getMyPosts(user.getId());
 
         List<PetPostResponse> response = posts.stream()
-            .map(PetPostMapper::toResponse).toList();
+            .map(petPostMapper::toResponse).toList();
         
         return  ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<PetPostResponse> updatePost(@PathVariable Long id,
-        @RequestBody UpdatePetPostRequest request,
+        @Valid @RequestBody UpdatePetPostRequest request,
         Authentication authentication
     ) {
         User user = (User) authentication.getPrincipal();
@@ -89,7 +91,7 @@ public class PetPostController {
         PetPost post = petPostService.updatePost(id, request, user);
         
         return ResponseEntity.ok(
-            PetPostMapper.toResponse(post)
+            petPostMapper.toResponse(post)
         );
     }
 

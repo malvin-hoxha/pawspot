@@ -1,4 +1,4 @@
-package com.pawspot.auth;
+package com.pawspot.auth.response;
 
 public class AuthResponse {
     private String accessToken;

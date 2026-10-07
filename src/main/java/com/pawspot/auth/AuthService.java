@@ -3,6 +3,10 @@ package com.pawspot.auth;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.pawspot.auth.request.LoginRequest;
+import com.pawspot.auth.request.RegisterRequest;
+import com.pawspot.auth.response.AuthResponse;
+import com.pawspot.auth.response.UserResponse;
 import com.pawspot.exception.InvalidCredentialsException;
 import com.pawspot.security.JwtService;
 import com.pawspot.user.User;
