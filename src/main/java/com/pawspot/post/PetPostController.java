@@ -5,6 +5,10 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.pawspot.post.mapper.PetPostMapper;
+import com.pawspot.post.request.CreatePetPostRequest;
+import com.pawspot.post.request.UpdatePetPostRequest;
+import com.pawspot.post.response.PetPostResponse;
 import com.pawspot.user.User;
 
 import jakarta.validation.Valid;
@@ -15,10 +19,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
 
 @RestController
 @RequestMapping("/api/posts")
@@ -38,21 +46,7 @@ public class PetPostController {
 
         PetPost post = petPostService.createPost(request, image, user);
 
-        PetPostResponse response = new PetPostResponse(
-            post.getId(),
-            post.getType(),
-            post.getTitle(),
-            post.getDescription(),
-            post.getSpecies(),
-            post.getCity(),
-            post.getArea(),
-            post.getStatus(),
-            post.getImageUrl(),
-            post.getCreatedAt(),
-            post.getUpdatedAt(),
-            post.getUser().getId(),
-            post.getUser().getName()
-        );
+        PetPostResponse response = PetPostMapper.toResponse(post);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -61,44 +55,55 @@ public class PetPostController {
     public ResponseEntity<List<PetPostResponse>> getPosts() {
         List<PetPost> posts = petPostService.getPosts();
         List<PetPostResponse> response = posts.stream()
-            .map(post -> new PetPostResponse(
-                    post.getId(),
-                    post.getType(),
-                    post.getTitle(),
-                    post.getDescription(),
-                    post.getSpecies(),
-                    post.getCity(),
-                    post.getArea(),
-                    post.getStatus(),
-                    post.getImageUrl(),
-                    post.getCreatedAt(),
-                    post.getUpdatedAt(),
-                    post.getUser().getId(),
-                    post.getUser().getName()
-            )).toList();
+            .map(PetPostMapper::toResponse).toList();
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PetPostResponse> getPost(@PathVariable Long id) {
         PetPost post = petPostService.getPost(id);
-        PetPostResponse response = new PetPostResponse (
-            post.getId(),
-            post.getType(),
-            post.getTitle(),
-            post.getDescription(),
-            post.getSpecies(),
-            post.getCity(),
-            post.getArea(),
-            post.getStatus(),
-            post.getImageUrl(),
-            post.getCreatedAt(),
-            post.getUpdatedAt(),
-            post.getUser().getId(),
-            post.getUser().getName()
-        );
-
+        PetPostResponse response = PetPostMapper.toResponse(post);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/my")
+    public ResponseEntity<List<PetPostResponse>> getMyPosts(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+
+
+        List<PetPost> posts = petPostService.getMyPosts(user.getId());
+
+        List<PetPostResponse> response = posts.stream()
+            .map(PetPostMapper::toResponse).toList();
+        
+        return  ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<PetPostResponse> updatePost(@PathVariable Long id,
+        @RequestBody UpdatePetPostRequest request,
+        Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+
+        PetPost post = petPostService.updatePost(id, request, user);
+        
+        return ResponseEntity.ok(
+            PetPostMapper.toResponse(post)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePost(
+        @PathVariable Long id,
+        Authentication authentication
+    ) {
+        User user = (User) authentication.getPrincipal();
+
+        petPostService.deletePost(id, user);
+
+        return ResponseEntity.noContent().build();
+    }
+    
     
 }

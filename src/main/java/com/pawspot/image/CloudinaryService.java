@@ -67,4 +67,18 @@ public class CloudinaryService {
             );
         }
     }
+
+    public void delete(String publicId) {
+        try {
+            cloudinary.uploader().destroy(
+                publicId,
+                ObjectUtils.asMap(
+                    "resource_type", "image"
+                ));
+        } catch (Exception e) {
+            throw new ImageUploadException(
+                "Failed to delete image"
+            );
+        }
+    }
 }

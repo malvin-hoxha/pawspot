@@ -49,4 +49,14 @@ public class GlobalExceptionHandler {
                 "message", ex.getMessage()
             ));
     }
+
+    @ExceptionHandler(ForbiddenOperationException.class)
+    public ResponseEntity<Map<String, String>> handlePostUpdate(
+        ForbiddenOperationException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(Map.of(
+                "message", ex.getMessage()
+            ));
+    }
 }

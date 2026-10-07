@@ -1,6 +1,10 @@
-package com.pawspot.post;
+package com.pawspot.post.response;
 
 import java.time.LocalDateTime;
+
+import com.pawspot.post.PetSpecies;
+import com.pawspot.post.PostStatus;
+import com.pawspot.post.PostType;
 
 public class PetPostResponse {
     private Long id;

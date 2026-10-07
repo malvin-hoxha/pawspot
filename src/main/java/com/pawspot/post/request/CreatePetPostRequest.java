@@ -1,4 +1,7 @@
-package com.pawspot.post;
+package com.pawspot.post.request;
+
+import com.pawspot.post.PetSpecies;
+import com.pawspot.post.PostType;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -25,28 +28,4 @@ public class CreatePetPostRequest {
     private String city;
 
     private String area;
-
-    public PostType getType() {
-        return type;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public PetSpecies getSpecies() {
-        return species;
-    }
-
-    public String getCity() {
-        return city;
-    }
-
-    public String getArea() {
-        return area;
-    }
 }
