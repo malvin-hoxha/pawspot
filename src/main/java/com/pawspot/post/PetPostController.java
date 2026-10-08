@@ -66,15 +66,21 @@ public class PetPostController {
         @RequestParam(required = false) PetSpecies species,
         @RequestParam(required = false) String city,
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(defaultValue = "createdAt") String sortBy,
+        @RequestParam(defaultValue = "desc") String direction,
+        @RequestParam(required = false) String search
     ) {
         Page<PetPost> posts = petPostService.getPosts(
             type,
             status,
             species,
             city,
+            search,
             page,
-            size
+            size,
+            sortBy,
+            direction
         );
         PageResponse<PetPostResponse> response = petPostMapper.toPageResponse(posts);
 

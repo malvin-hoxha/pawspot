@@ -13,7 +13,9 @@ public class PetPostSpecification {
             PostType type,
             PostStatus status,
             PetSpecies species,
-            String city
+            String city,
+            String search
+            
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicate = criteriaBuilder.conjunction();
@@ -43,6 +45,24 @@ public class PetPostSpecification {
                 predicate = criteriaBuilder.and(
                     predicate,
                     criteriaBuilder.equal(root.get("city"), city)
+                );
+            }
+
+            if (search != null && !search.isBlank()) {
+                String pattern = "%" + search.toLowerCase() + "%";
+
+                predicate = criteriaBuilder.and(
+                    predicate,
+                    criteriaBuilder.or(
+                        criteriaBuilder.like(
+                            criteriaBuilder.lower(root.get("title")),
+                            pattern
+                        ),
+                        criteriaBuilder.like(
+                            criteriaBuilder.lower(root.get("description")),
+                            pattern
+                        )
+                    )
                 );
             }
 
