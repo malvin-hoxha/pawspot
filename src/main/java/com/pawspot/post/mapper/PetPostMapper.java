@@ -1,5 +1,7 @@
 package com.pawspot.post.mapper;
 
+import java.util.List;
+
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -43,6 +45,24 @@ public interface PetPostMapper {
     @Mapping(target = "user", ignore = true)
     PetPost toEntity(CreatePetPostRequest request);
 
-    @Mapping(source = "number", target = "page")
-    PageResponse<PetPostResponse> toPageResponse(Page<PetPost> posts);
+    default PageResponse<PetPostResponse> toPageResponse(
+            Page<PetPost> posts
+    ) {
+        List<PetPostResponse> content = posts.getContent()
+            .stream()
+            .map(this::toResponse)
+            .toList();
+
+        return new PageResponse<>(
+            content,
+            posts.getNumber(),
+            posts.getSize(),
+            posts.getTotalElements(),
+            posts.getTotalPages(),
+            posts.isFirst(),
+            posts.isLast()
+        );
+    }
+
+    List<PetPostResponse> toResponseList(List<PetPost> posts);
 }

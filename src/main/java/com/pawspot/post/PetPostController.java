@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.pawspot.common.PageResponse;
+import com.pawspot.post.enums.PetSpecies;
+import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
@@ -60,10 +62,20 @@ public class PetPostController {
     @GetMapping
     public ResponseEntity<PageResponse<PetPostResponse>> getPosts(
         @RequestParam(required = false) PostType type,
+        @RequestParam(required = false) PostStatus status,
+        @RequestParam(required = false) PetSpecies species,
+        @RequestParam(required = false) String city,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
-        Page<PetPost> posts = petPostService.getPosts(type, page, size);
+        Page<PetPost> posts = petPostService.getPosts(
+            type,
+            status,
+            species,
+            city,
+            page,
+            size
+        );
         PageResponse<PetPostResponse> response = petPostMapper.toPageResponse(posts);
 
         return ResponseEntity.ok(response);
@@ -83,9 +95,8 @@ public class PetPostController {
 
         List<PetPost> posts = petPostService.getMyPosts(user.getId());
 
-        List<PetPostResponse> response = posts.stream()
-            .map(petPostMapper::toResponse).toList();
-        
+        List<PetPostResponse> response = petPostMapper.toResponseList(posts);
+
         return  ResponseEntity.ok(response);
     }
 

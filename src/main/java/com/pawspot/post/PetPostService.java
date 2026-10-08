@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,10 +14,13 @@ import com.pawspot.exception.PostNotFoundException;
 import com.pawspot.exception.validation.PostValidationException;
 import com.pawspot.image.CloudinaryService;
 import com.pawspot.image.ImageUploadResult;
+import com.pawspot.post.enums.PetSpecies;
+import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
+import com.pawspot.post.specification.PetPostSpecification;
 import com.pawspot.user.User;
 
 @Service 
@@ -48,14 +52,19 @@ public class PetPostService {
         return petPostRepository.save(post);
     }
 
-    public Page<PetPost> getPosts(PostType type, int page, int size) {
+    public Page<PetPost> getPosts(PostType type, PostStatus status,
+        PetSpecies species, String city, int page, int size) {
+
         Pageable pageable = PageRequest.of(page, size);
 
-        if (type != null) {
-            return petPostRepository.findByType(type, pageable);
-        }
+        Specification<PetPost> specification = PetPostSpecification.withFilters(
+            type,
+            status,
+            species,
+            city
+        );
 
-        return petPostRepository.findAll(pageable);
+        return petPostRepository.findAll(specification, pageable);
     }
 
     public PetPost getPost(Long id) {
