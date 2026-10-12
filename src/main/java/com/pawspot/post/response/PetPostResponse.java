@@ -22,19 +22,19 @@ public class PetPostResponse {
     private String imageUrl;
 
     public PetPostResponse(
-            Long id,
-            PostType type,
-            String title,
-            String description,
-            PetSpecies species,
-            String city,
-            String area,
-            PostStatus status,
-            String imageUrl,
-            LocalDateTime createdAt,
-            LocalDateTime updatedAt,
-            Long userId,
-            String userName
+        Long id,
+        PostType type,
+        String title,
+        String description,
+        PetSpecies species,
+        String city,
+        String area,
+        PostStatus status,
+        String imageUrl,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        Long userId,
+        String userName
     ) {
         this.id = id;
         this.type = type;

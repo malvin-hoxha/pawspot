@@ -1,19 +1,5 @@
 package com.pawspot.auth.response;
 
-public class AuthResponse {
-    private String accessToken;
-    private UserResponse user;
-
-    public AuthResponse(String accessToken, UserResponse user) {
-        this.accessToken = accessToken;
-        this.user = user;
-    }
-
-    public String getAccessToken() {
-        return accessToken;
-    }
-
-    public UserResponse getUser() {
-        return user;
-    }
-}
+public record AuthResponse(
+    UserResponse user
+) {}
