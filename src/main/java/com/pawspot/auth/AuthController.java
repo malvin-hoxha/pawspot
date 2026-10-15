@@ -89,27 +89,25 @@ public class AuthController {
     ) String refreshToken) 
     {
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new InvalidCredentialsException(
-                "Refresh token is missing"
-            );
+            return clearAuthCookies();
         }
 
-        RefreshResult result = refreshTokenService.rotate(refreshToken);
+        try {
+            RefreshResult result = refreshTokenService.rotate(refreshToken);
 
-        ResponseCookie accessCookie = authCookieFactory.createAccessCookie(result.accessToken());
+            ResponseCookie accessCookie = authCookieFactory.createAccessCookie(result.accessToken());
 
-        ResponseCookie refreshCookie = authCookieFactory.createRefreshCookie(result.refreshToken());
+            ResponseCookie refreshCookie = authCookieFactory.createRefreshCookie(result.refreshToken());
 
-        return ResponseEntity.ok()
-            .header(
-                HttpHeaders.SET_COOKIE,
-                accessCookie.toString()
-            )
-            .header(
-                HttpHeaders.SET_COOKIE,
-                refreshCookie.toString()
-            )
-            .build();
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .build();
+        } catch (InvalidCredentialsException ex) {
+            return clearAuthCookies();
+        }
+
+        
     }
 
     @PostMapping("/logout")
@@ -140,5 +138,16 @@ public class AuthController {
     @GetMapping("/csrf")
     public CsrfToken csrf(CsrfToken csrfToken) {
         return csrfToken;
+    }
+
+    private ResponseEntity<Void> clearAuthCookies() {
+        ResponseCookie accessCookie = authCookieFactory.clearAccessCookie();
+
+        ResponseCookie refreshCookie = authCookieFactory.clearRefreshCookie();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .header(HttpHeaders.SET_COOKIE, accessCookie.toString())
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+            .build();
     }
 }
