@@ -1,5 +1,6 @@
 package com.pawspot.config;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -63,5 +64,21 @@ public class SecurityConfig {
             );
 
         return  http.build();
+    }
+
+
+    // Prevent Spring Boot from auto-registering the JWT filter as a servlet filter.
+    // It is already registered in the Spring Security filter chain.
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(
+        JwtAuthenticationFilter filter
+    ) {
+
+        FilterRegistrationBean<JwtAuthenticationFilter> registration =
+            new FilterRegistrationBean<>(filter);
+
+        registration.setEnabled(false);
+
+        return registration;
     }
 }
