@@ -6,9 +6,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.pawspot.auth.refreshtoken.RefreshToken;
-import com.pawspot.auth.refreshtoken.RefreshTokenRepository;
-import com.pawspot.auth.refreshtoken.RefreshTokenRevocationService;
+import com.pawspot.auth.refreshtoken.entity.RefreshToken;
+import com.pawspot.auth.refreshtoken.repository.RefreshTokenRepository;
+import com.pawspot.auth.refreshtoken.service.RefreshTokenRevocationService;
+import com.pawspot.auth.refreshtoken.service.RefreshTokenService;
 import com.pawspot.auth.request.LoginRequest;
 import com.pawspot.auth.request.RegisterRequest;
 import com.pawspot.auth.response.LoginResult;
@@ -20,8 +21,10 @@ import com.pawspot.security.JwtService;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 
+//User registration, credential validation, and login
 @Service 
 public class AuthService {
     private final UserRepository userRepository;
@@ -29,15 +32,17 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenRevocationService refreshTokenRevocationService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, RefreshTokenRepository refreshTokenRepository,
-        RefreshTokenRevocationService refreshTokenRevocationService
+        RefreshTokenRevocationService refreshTokenRevocationService, RefreshTokenService refreshTokenService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenRepository = refreshTokenRepository;
-        this.refreshTokenRevocationService = new RefreshTokenRevocationService(refreshTokenRepository);
+        this.refreshTokenRevocationService = refreshTokenRevocationService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public User register(RegisterRequest request) {
@@ -57,31 +62,14 @@ public class AuthService {
 
     public LoginResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                    .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
+            .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
         
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) 
             throw new InvalidCredentialsException("Invalid email or password");
 
+        GeneratedRefreshToken generatedRefreshToken = refreshTokenService.createSession(user);
+
         String accessToken = jwtService.generateAccessToken(user);
-        GeneratedRefreshToken generatedRefreshToken = jwtService.generateRefreshToken(user);
-
-        RefreshToken refreshTokenEntity = new RefreshToken();
-
-        refreshTokenEntity.setTokenId(
-            generatedRefreshToken.tokenId()
-        );
-
-        refreshTokenEntity.setFamilyId(
-            generatedRefreshToken.familyId()
-        );
-
-        refreshTokenEntity.setExpiresAt(
-            generatedRefreshToken.expiresAt()
-        );
-
-        refreshTokenEntity.setUser(user);
-
-        refreshTokenRepository.save(refreshTokenEntity);
 
         UserResponse userResponse = new UserResponse(
             user.getId(),
@@ -97,37 +85,26 @@ public class AuthService {
     public RefreshResult refreshTokens(String refreshToken) {
 
         try {
-            String email = jwtService.extractEmail(refreshToken);
+            Claims claims = jwtService.validateRefreshToken(refreshToken);
 
-            String tokenId = jwtService.extractTokenId(refreshToken);
+            String email = claims.getSubject();
+            String tokenId = claims.getId();
+            String familyId = claims.get("family_id", String.class);
 
-            User user = userRepository
-                .findByEmail(email)
+            User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                    new InvalidCredentialsException("Invalid refresh token")
+            );
+
+            RefreshToken storedToken = refreshTokenRepository
+                .findByTokenIdForUpdate(tokenId)
                 .orElseThrow(() ->
                     new InvalidCredentialsException(
                         "Invalid refresh token"
                     )
-                );
-
-            if (!jwtService.isRefreshTokenValid(
-                    refreshToken, user
-            )) {
-                throw new InvalidCredentialsException(
-                    "Invalid refresh token"
-                );
-            }
-
-            RefreshToken storedToken = refreshTokenRepository
-                    .findByTokenIdForUpdate(tokenId)
-                    .orElseThrow(() ->
-                        new InvalidCredentialsException(
-                            "Invalid refresh token"
-                        )
-                    );
-
-            /*
-            * REUSE DETECTION
-            */
+            );
+            
+            //REUSE DETECTION
             if (storedToken.isRevoked()) {
 
                 refreshTokenRevocationService
@@ -140,44 +117,24 @@ public class AuthService {
                 );
             }
 
-            /*
-            * Extra safety:
-            * το token της DB πρέπει να ανήκει
-            * στον ίδιο user.
-            */
-            if (!storedToken.getUser()
-                    .getId()
-                    .equals(user.getId())) {
-
+            if (
+                !storedToken.getUser().getId().equals(user.getId()) ||
+                !storedToken.getFamilyId().equals(familyId)
+            ) {
                 throw new InvalidCredentialsException(
                     "Invalid refresh token"
                 );
             }
 
-            /*
-            * Normal rotation:
-            * σκοτώνουμε το παλιό token.
-            */
             storedToken.setRevokedAt(Instant.now());
+            String newAccessToken = jwtService.generateAccessToken(user);
 
-            /*
-            * Νέο access token.
-            */
-            String newAccessToken =
-                jwtService.generateAccessToken(user);
+            GeneratedRefreshToken newRefreshToken = jwtService.generateRefreshToken(
+                user,
+                storedToken.getFamilyId()
+            );
 
-            /*
-            * Νέο refresh token,
-            * ΙΔΙΑ family.
-            */
-            GeneratedRefreshToken newRefreshToken =
-                jwtService.generateRefreshToken(
-                    user,
-                    storedToken.getFamilyId()
-                );
-
-            RefreshToken newRefreshTokenEntity =
-                new RefreshToken();
+            RefreshToken newRefreshTokenEntity = new RefreshToken();
 
             newRefreshTokenEntity.setTokenId(
                 newRefreshToken.tokenId()
@@ -206,28 +163,6 @@ public class AuthService {
             throw new InvalidCredentialsException(
                 "Invalid or expired refresh token"
             );
-        }
-    }
-
-    public void logout(String refreshToken) {
-        if (refreshToken == null) {
-            return;
-        }
-
-        try {
-            String tokenId = jwtService.extractTokenId(refreshToken);
-
-            refreshTokenRepository
-                .findByTokenId(tokenId)
-                .ifPresent(storedToken ->
-                    refreshTokenRevocationService.revokeFamily(
-                        storedToken.getFamilyId()
-                    )
-                );
-
-        } catch (JwtException e) {
-            // Δεν χρειάζεται να αποτύχει το logout.
-            // Τα cookies θα διαγραφούν έτσι κι αλλιώς.
         }
     }
 }

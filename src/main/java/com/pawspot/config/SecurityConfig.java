@@ -27,9 +27,10 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean 
+    @Bean //managed by Spring
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
+        http.cors(cors -> {})
+            .csrf(csrf -> csrf.spa())
             .sessionManagement(session -> session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
                 )
@@ -54,6 +55,7 @@ public class SecurityConfig {
                     "/api/auth/refresh", "/api/auth/logout").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/posts/my").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
+                .requestMatchers(HttpMethod.GET,"/api/auth/csrf").permitAll()
                 .anyRequest().authenticated()
             ).addFilterBefore(
                 jwtAuthenticationFilter,

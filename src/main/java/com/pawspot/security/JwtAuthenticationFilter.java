@@ -11,6 +11,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -18,6 +19,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+//Authenticates users on protected requests
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter{
 
@@ -59,23 +61,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
         if (token != null) {
 
             try {
-                String email = jwtService.extractEmail(token);        
+                Claims claims = jwtService.validateAccessToken(token);       //Verification sign
 
                 if(SecurityContextHolder.getContext().getAuthentication() == null) {
-                    User user = userRepository.findByEmail(email).orElse(null);
-                    if (user != null && jwtService.isAccessTokenValid(token, user)) {
+                    User user = userRepository.findByEmail(claims.getSubject()).orElse(null);
+                    if (user != null) {
                         UsernamePasswordAuthenticationToken authentication = 
-                            new UsernamePasswordAuthenticationToken(user, null, List.of());
+                            new UsernamePasswordAuthenticationToken(user, null, List.of()); //List.of() means the roles of the user
                             SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
                 } 
-                
             } catch (JwtException e) {
                 SecurityContextHolder.clearContext();
             }
         }
-
         filterChain.doFilter(request, response);
     }
-
 }

@@ -14,7 +14,10 @@ import com.pawspot.user.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 
+//Generates and validates JWTs
 @Service 
 public class JwtService {
     private final SecretKey signingKey;
@@ -29,100 +32,47 @@ public class JwtService {
         this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.accessExpiration = accessExpiration;
         this.refreshExpiration = refreshExpiration;
-    };
-
-    public String generateAccessToken(User user) {
-        return generateToken(
-            user.getEmail(),
-            accessExpiration,
-            "access"
-        );
     }
 
-    public GeneratedRefreshToken generateRefreshToken(User user) {
-        String familyId = UUID.randomUUID().toString();
-
-        return generateRefreshToken(user, familyId);
-    }
-
-    private String generateToken(
-        String email,
-        long expiration,
-        String tokenType
-    ) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expiration);
-
-        return Jwts.builder()
-            .subject(email)
-            .claim("token_type", tokenType)
-            .issuedAt(now)
-            .expiration(expiryDate)
-            .signWith(signingKey)
-            .compact();
-    }
-
-    public String extractEmail(String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
-    }
-
-    private Date extractExpiration(String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getExpiration();
-    }
-
-    public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    public boolean isAccessTokenValid(String token, User user) {
-        return isTokenValid(token, user, "access");
-    }
-
-    public boolean isRefreshTokenValid(String token, User user) {
-        return isTokenValid(token, user, "refresh");
-    }
-
-    private boolean isTokenValid(
-        String token,
-        User user,
-        String expectedType
-    ) {
-        String email = extractEmail(token);
-        String tokenType = extractTokenType(token);
-
-        return email.equals(user.getEmail())
-            && expectedType.equals(tokenType)
-            && !isTokenExpired(token);
-    }
-
-    public String extractTokenType(String token) {
+    private Claims parseToken(String token) {
         return Jwts.parser()
             .verifyWith(signingKey)
             .build()
             .parseSignedClaims(token)
-            .getPayload()
-            .get("token_type", String.class);
+            .getPayload();
+    }
+
+    public String generateAccessToken(User user) {
+        Instant now = Instant.now();
+
+        return Jwts.builder()
+            .subject(user.getEmail())
+            .claim("token_type", "access")
+            .issuedAt(Date.from(now))
+            .expiration(
+                Date.from(now.plusMillis(accessExpiration))
+            )
+            .signWith(signingKey)
+            .compact();
     }
 
     public GeneratedRefreshToken generateRefreshToken(
         User user,
         String familyId
     ) {
+        Instant expiresAt = Instant.now().plusMillis(refreshExpiration);
+
+        return generateRefreshToken(user, familyId, expiresAt);
+    }
+
+    public GeneratedRefreshToken generateRefreshToken(
+        User user,
+        String familyId,
+        Instant expiresAt
+    ) {
         String tokenId = UUID.randomUUID().toString();
 
         Instant now = Instant.now();
-        Instant expiresAt =
-            now.plusMillis(refreshExpiration);
 
         String token = Jwts.builder()
             .subject(user.getEmail())
@@ -142,21 +92,48 @@ public class JwtService {
         );
     }
 
-    public String extractTokenId(String token) {
-        return Jwts.parser()
-            .verifyWith(signingKey)
-            .build()
-            .parseSignedClaims(token)
-            .getPayload()
-            .getId();
+    public Claims validateAccessToken(String token) {
+        return validateToken(token, "access");
     }
 
-    public String extractFamilyId(String token) {
-        return Jwts.parser()
-            .verifyWith(signingKey)
-            .build()
-            .parseSignedClaims(token)
-            .getPayload()
-            .get("family_id", String.class);
+    public Claims validateRefreshToken(String token) {
+        return validateToken(token, "refresh");
+    }
+
+    private Claims validateToken(
+        String token,
+        String expectedType
+    ) {
+        Claims claims = parseToken(token);
+
+        String tokenType = claims.get(
+            "token_type",
+            String.class
+        );
+
+        if (!expectedType.equals(tokenType)) {
+            throw new JwtException("Invalid token type");
+        }
+
+        if (claims.getSubject() == null ||
+            claims.getSubject().isBlank()) {
+            throw new JwtException("Missing token subject");
+        }
+
+        if (claims.getExpiration() == null) {
+            throw new JwtException("Missing token expiration");
+        }
+
+        if ("refresh".equals(expectedType)) {
+            String tokenId = claims.getId();
+            String familyId = claims.get("family_id", String.class);
+
+            if (tokenId == null || tokenId.isBlank() ||
+                familyId == null || familyId.isBlank()) {
+                throw new JwtException("Invalid refresh token claims");
+            }
+        }
+
+        return claims;
     }
 }

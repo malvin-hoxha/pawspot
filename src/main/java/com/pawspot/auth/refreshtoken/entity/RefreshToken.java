@@ -1,7 +1,8 @@
-package com.pawspot.auth.refreshtoken;
+package com.pawspot.auth.refreshtoken.entity;
 
 import java.time.Instant;
 
+import com.pawspot.security.GeneratedRefreshToken;
 import com.pawspot.user.User;
 
 import jakarta.persistence.*;
@@ -45,6 +46,20 @@ public class RefreshToken {
 
     public boolean isRevoked() {
         return revokedAt != null;
+    }
+
+    public static RefreshToken from(
+        GeneratedRefreshToken token,
+        User user
+    ) {
+        RefreshToken entity = new RefreshToken();
+
+        entity.setTokenId(token.tokenId());
+        entity.setFamilyId(token.familyId());
+        entity.setExpiresAt(token.expiresAt());
+        entity.setUser(user);
+
+        return entity;
     }
 
     // getters / setters
