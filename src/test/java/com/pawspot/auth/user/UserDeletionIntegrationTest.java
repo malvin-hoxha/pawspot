@@ -307,4 +307,79 @@ class UserDeletionIntegrationTest {
         // Επιβεβαιώνουμε ότι η διαγραφή έγινε commit
         assertFalse(userRepository.existsById(userId));
     }
+
+    @Test
+    void shouldRejectRegistrationWithOversizedPassword() throws Exception {
+        String password = "a".repeat(73);
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "name": "Test User",
+                        "email": "oversized@test.com",
+                        "password": "%s"
+                    }
+                    """.formatted(password))
+        )
+        .andExpect(status().isBadRequest());
+
+        assertFalse(userRepository.existsByEmail("oversized@test.com"));
+    }
+
+    @Test
+    void shouldRejectOversizedLoginPasswordRegardlessOfEmail()
+        throws Exception {
+
+        User user = new User();
+        user.setName("Password Limit User");
+        user.setEmail("password-limit@test.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+
+        userRepository.save(user);
+
+        String password = "a".repeat(73);
+
+        for (String email : List.of(
+            "password-limit@test.com",
+            "unknown-password-limit@test.com"
+        )) {
+            mockMvc.perform(
+                MockMvcRequestBuilders.post("/api/auth/login")
+                    .with(csrf())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                            "email": "%s",
+                            "password": "%s"
+                        }
+                        """.formatted(email, password))
+            )
+            .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void shouldValidatePasswordUsingUtf8Bytes() throws Exception {
+        String password = "α".repeat(37);
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "name": "Greek Password User",
+                        "email": "greek-password@test.com",
+                        "password": "%s"
+                    }
+                    """.formatted(password))
+        )
+        .andExpect(status().isBadRequest());
+    }
+
+
+
 }

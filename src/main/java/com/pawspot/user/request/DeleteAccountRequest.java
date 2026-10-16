@@ -1,7 +1,11 @@
 package com.pawspot.user.request;
 
+import com.pawspot.validation.ValidBcryptPassword;
+
 import jakarta.validation.constraints.NotBlank;
 
 public record DeleteAccountRequest(
-    @NotBlank String password
+    @NotBlank 
+    @ValidBcryptPassword
+    String password
 ) {}

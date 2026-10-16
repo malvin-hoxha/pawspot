@@ -1,5 +1,7 @@
 package com.pawspot.auth.request;
 
+import com.pawspot.validation.ValidBcryptPassword;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -14,6 +16,7 @@ public class RegisterRequest {
 
     @NotBlank
     @Size(min = 6)
+    @ValidBcryptPassword
     private String password;
 
     public String getName() {
