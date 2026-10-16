@@ -15,6 +15,7 @@ import com.pawspot.exception.InvalidCredentialsException;
 import com.pawspot.auth.refreshtoken.repository.RefreshSessionRepository;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -379,6 +380,81 @@ class UserDeletionIntegrationTest {
         )
         .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void shouldReturnConflictForDuplicateRegistration() throws Exception {
+
+        User user = new User();
+        user.setName("Existing User");
+        user.setEmail("duplicate@test.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+
+        userRepository.save(user);
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "name": "Second User",
+                        "email": "duplicate@test.com",
+                        "password": "password123"
+                    }
+                    """)
+        )
+        .andExpect(status().isConflict());
+
+        assertEquals(1, userRepository.findAll().stream()
+            .filter(u -> u.getEmail().equals("duplicate@test.com"))
+            .count());
+    }
+
+    @Test
+    void shouldNormalizeEmailOnRegistration() throws Exception {
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "name": "Normalized User",
+                        "email": "MixedCase@Test.com",
+                        "password": "password123"
+                    }
+                    """)
+        )
+        .andExpect(status().isCreated());
+
+        assertTrue(userRepository.existsByEmail("mixedcase@test.com"));
+    }
+
+    @Test
+    void shouldRejectDuplicateEmailRegardlessOfCase() throws Exception {
+
+        User user = new User();
+        user.setName("First User");
+        user.setEmail("case-test@test.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+        userRepository.save(user);
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                        "name": "Second User",
+                        "email": "CASE-TEST@TEST.COM",
+                        "password": "password123"
+                    }
+                    """)
+        )
+        .andExpect(status().isConflict());
+    }
+
+
 
 
 
