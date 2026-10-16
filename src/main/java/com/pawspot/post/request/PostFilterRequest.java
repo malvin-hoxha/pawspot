@@ -7,6 +7,7 @@ import com.pawspot.post.enums.PostType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,7 +17,10 @@ public class PostFilterRequest {
     private PostType type;
     private PostStatus status;
     private PetSpecies species;
+    @Size(max = 255)
     private String city;
+
+    @Size(max = 100)
     private String search;
 
     @Min(value = 0, message = "Page must be zero or greater")
