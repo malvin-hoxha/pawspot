@@ -23,4 +23,8 @@ public interface RefreshSessionRepository
     Optional<RefreshSession> findByIdForUpdate(
         @Param("sessionId") String sessionId
     );
+
+    void deleteAllByUserId(Long userId);
+
+    boolean existsByUserId(Long userId);
 }

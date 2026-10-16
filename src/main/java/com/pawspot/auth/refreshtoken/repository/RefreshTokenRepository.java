@@ -30,4 +30,8 @@ public interface RefreshTokenRepository
     List<RefreshToken> findAllByFamilyIdAndRevokedAtIsNull(
         String familyId
     );
+
+    void deleteAllByUserId(Long userId);
+
+    boolean existsByUserId(Long userId);
 }
