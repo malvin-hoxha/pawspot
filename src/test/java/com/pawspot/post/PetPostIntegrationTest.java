@@ -1,6 +1,10 @@
 package com.pawspot.post;
 
+import java.util.List;
+import org.springframework.data.domain.Page;
+
 import com.pawspot.exception.ForbiddenOperationException;
+import com.pawspot.exception.image.ImageUploadException;
 import com.pawspot.image.CloudinaryService;
 import com.pawspot.image.ImageUploadResult;
 import com.pawspot.post.enums.PetSpecies;
@@ -11,17 +15,20 @@ import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,6 +59,12 @@ public class PetPostIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @BeforeEach
+    void cleanDatabase() {
+        petPostRepository.deleteAll();
+        userRepository.deleteAll();
+    }
 
     @Test
     void shouldCreatePost() {
@@ -265,4 +278,167 @@ public class PetPostIntegrationTest {
         // Assert: Δεν ζητήθηκε διαγραφή εικόνας
         verify(cloudinaryService, never()).delete(anyString());
     }
+
+    @Test
+    void shouldFilterPosts() {
+        // Arrange: Δημιουργία χρήστη
+        User user = new User();
+        user.setName("Filter User");
+        user.setEmail("filter-posts@test.com");
+        user.setPassword("test-password");
+
+        User savedUser = userRepository.save(user);
+
+        // Αγγελία 1
+        PetPost post1 = new PetPost();
+        post1.setTitle("Lost dog");
+        post1.setDescription("Brown dog");
+        post1.setCity("Thessaloniki");
+        post1.setType(PostType.LOST);
+        post1.setSpecies(PetSpecies.DOG);
+        post1.setUser(savedUser);
+
+        // Αγγελία 2
+        PetPost post2 = new PetPost();
+        post2.setTitle("Found cat");
+        post2.setDescription("White cat");
+        post2.setCity("Athens");
+        post2.setType(PostType.FOUND);
+        post2.setSpecies(PetSpecies.CAT);
+        post2.setUser(savedUser);
+
+        // Αγγελία 3
+        PetPost post3 = new PetPost();
+        post3.setTitle("Lost cat");
+        post3.setDescription("Black cat");
+        post3.setCity("Thessaloniki");
+        post3.setType(PostType.LOST);
+        post3.setSpecies(PetSpecies.CAT);
+        post3.setUser(savedUser);
+
+        petPostRepository.saveAll(List.of(post1, post2, post3));
+
+        // Act: Ζητάμε LOST αγγελίες στη Θεσσαλονίκη για DOG
+        Page<PetPost> result = petPostService.getPosts(
+            PostType.LOST,
+            null,                 // status
+            PetSpecies.DOG,
+            "Thessaloniki",
+            null,                 // search
+            0,                    // page
+            10,                   // size
+            "createdAt",
+            "desc"
+        );
+
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Lost dog", result.getContent().get(0).getTitle());
+
+        Page<PetPost> activePosts = petPostService.getPosts(
+            null,
+            PostStatus.ACTIVE,
+            null,
+            null,
+            null,
+            0,
+            10,
+            "createdAt",
+            "desc"
+        );
+
+        assertEquals(3, activePosts.getTotalElements());
+
+        Page<PetPost> searchResults = petPostService.getPosts(
+            null,
+            null,
+            null,
+            null,
+            "BROWN",
+            0,
+            10,
+            "createdAt",
+            "desc"
+        );
+
+        assertEquals(1, searchResults.getTotalElements());
+        assertEquals(
+            "Lost dog",
+            searchResults.getContent().get(0).getTitle()
+        );
+    }
+
+    @Test
+    void shouldPaginateAndSortPosts() {
+        User user = new User();
+        user.setName("Pagination User");
+        user.setEmail("pagination@test.com");
+        user.setPassword("test-password");
+
+        User savedUser = userRepository.save(user);
+
+        for (String title : List.of("Alpha", "Bravo", "Charlie")) {
+            PetPost post = new PetPost();
+            post.setTitle(title);
+            post.setDescription("Test description");
+            post.setCity("Thessaloniki");
+            post.setType(PostType.LOST);
+            post.setSpecies(PetSpecies.DOG);
+            post.setUser(savedUser);
+
+            petPostRepository.save(post);
+        }
+
+        // Ζητάμε τη δεύτερη σελίδα, με 2 posts ανά σελίδα
+        // και αλφαβητική ταξινόμηση τίτλου.
+        Page<PetPost> result = petPostService.getPosts(
+            null, null, null, null, null,
+            1, 2, "title", "asc"
+        );
+
+        assertEquals(3, result.getTotalElements());
+        assertEquals(2, result.getTotalPages());
+        assertEquals(1, result.getContent().size());
+        assertEquals("Charlie", result.getContent().get(0).getTitle());
+    }
+
+    @Test
+    void shouldDeletePostEvenWhenCloudinaryFails() {
+        // Arrange: Δημιουργία χρήστη
+        User user = new User();
+        user.setName("Cloudinary Failure User");
+        user.setEmail("cloudinary-failure@test.com");
+        user.setPassword("test-password");
+
+        User savedUser = userRepository.save(user);
+
+        // Δημιουργία αγγελίας
+        PetPost post = new PetPost();
+        post.setTitle("Lost dog");
+        post.setDescription("Small brown dog");
+        post.setCity("Thessaloniki");
+        post.setType(PostType.LOST);
+        post.setSpecies(PetSpecies.DOG);
+        post.setImagePublicId("pawspot/posts/delete-failure");
+        post.setUser(savedUser);
+
+        Long postId = petPostRepository.save(post).getId();
+
+        // Προσομοιώνουμε αποτυχία του Cloudinary
+        doThrow(new ImageUploadException("Cloudinary unavailable"))
+            .when(cloudinaryService)
+            .delete("pawspot/posts/delete-failure");
+
+        // Act & Assert: Δεν πρέπει να πεταχτεί exception
+        assertDoesNotThrow(
+            () -> petPostService.deletePost(postId, savedUser)
+        );
+
+        // Η αγγελία πρέπει να έχει διαγραφεί από τη βάση
+        assertFalse(petPostRepository.existsById(postId));
+
+        // Το Cloudinary cleanup πρέπει να έχει επιχειρηθεί
+        verify(cloudinaryService).delete("pawspot/posts/delete-failure");
+    }
+
 }
