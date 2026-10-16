@@ -12,6 +12,7 @@ import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
+import com.pawspot.post.request.PostFilterRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.post.response.PetPostResponse;
 import com.pawspot.user.User;
@@ -61,30 +62,21 @@ public class PetPostController {
 
     @GetMapping
     public ResponseEntity<PageResponse<PetPostResponse>> getPosts(
-        @RequestParam(required = false) PostType type,
-        @RequestParam(required = false) PostStatus status,
-        @RequestParam(required = false) PetSpecies species,
-        @RequestParam(required = false) String city,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size,
-        @RequestParam(defaultValue = "createdAt") String sortBy,
-        @RequestParam(defaultValue = "desc") String direction,
-        @RequestParam(required = false) String search
+        @Valid @ModelAttribute PostFilterRequest request
     ) {
         Page<PetPost> posts = petPostService.getPosts(
-            type,
-            status,
-            species,
-            city,
-            search,
-            page,
-            size,
-            sortBy,
-            direction
+            request.getType(),
+            request.getStatus(),
+            request.getSpecies(),
+            request.getCity(),
+            request.getSearch(),
+            request.getPage(),
+            request.getSize(),
+            request.getSortBy(),
+            request.getDirection()
         );
-        PageResponse<PetPostResponse> response = petPostMapper.toPageResponse(posts);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(petPostMapper.toPageResponse(posts));
     }
 
     @GetMapping("/{id}")

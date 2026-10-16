@@ -31,9 +31,6 @@ public class PetPostService {
     private final CloudinaryService cloudinaryService;
     private final PetPostMapper petPostMapper;
 
-    private static final Set<String> ALLOWED_SORT_FIELDS =
-        Set.of("createdAt", "updatedAt", "title", "city");
-
 
     public PetPostService(PetPostRepository petPostRepository, CloudinaryService cloudinaryService,
         PetPostMapper petPostMapper
@@ -57,19 +54,10 @@ public class PetPostService {
         return petPostRepository.save(post);
     }
 
+    
+
     public Page<PetPost> getPosts(PostType type, PostStatus status,
         PetSpecies species, String city, String search,int page, int size, String sortBy, String direction) {
-
-        if (!ALLOWED_SORT_FIELDS.contains(sortBy)) {
-            throw new PostValidationException("Invalid sort field");
-        }   
-
-        if (!direction.equalsIgnoreCase("asc")
-                && !direction.equalsIgnoreCase("desc")) {
-            throw new PostValidationException(
-                "Direction must be 'asc' or 'desc'"
-            );
-        }
 
         Sort sort = direction.equalsIgnoreCase("asc")
             ? Sort.by(sortBy).ascending()
@@ -87,6 +75,8 @@ public class PetPostService {
 
         return petPostRepository.findAll(specification, pageable);
     }
+
+
 
     public PetPost getPost(Long id) {
         return petPostRepository.findById(id)

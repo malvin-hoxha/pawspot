@@ -86,7 +86,6 @@ class AuthControllerIntegrationTest {
     @Test
     void shouldLoginAndSetAuthCookies() throws Exception {
         String email = "login-test@pawspot.com";
-        String password = "Password123!";
 
         // Create a real user in the test database
         mockMvc.perform(
