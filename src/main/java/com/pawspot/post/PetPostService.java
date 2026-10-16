@@ -1,8 +1,9 @@
 package com.pawspot.post;
 
 import java.util.List;
-import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -30,6 +31,8 @@ public class PetPostService {
     private final PetPostRepository petPostRepository;
     private final CloudinaryService cloudinaryService;
     private final PetPostMapper petPostMapper;
+    private static final Logger log = LoggerFactory.getLogger(PetPostService.class);
+
 
 
     public PetPostService(PetPostRepository petPostRepository, CloudinaryService cloudinaryService,
@@ -44,14 +47,22 @@ public class PetPostService {
 
         ImageUploadResult uploadResult = cloudinaryService.upload(image);
 
-        PetPost post = petPostMapper.toEntity(request);
+        try {
+            PetPost post = petPostMapper.toEntity(request);
 
-        post.setImageUrl(uploadResult.imageUrl());
-        post.setImagePublicId(uploadResult.publicId());
+            post.setImageUrl(uploadResult.imageUrl());
+            post.setImagePublicId(uploadResult.publicId());
+            post.setUser(user);
 
-        post.setUser(user);
-
-        return petPostRepository.save(post);
+            return petPostRepository.save(post);
+        } catch (RuntimeException ex) {
+            try {
+                cloudinaryService.delete(uploadResult.publicId());
+            } catch (RuntimeException cleanupEx) {
+                ex.addSuppressed(cleanupEx);
+            }
+            throw ex;
+        }
     }
 
     
@@ -72,7 +83,7 @@ public class PetPostService {
             city,
             search
         );
-
+        
         return petPostRepository.findAll(specification, pageable);
     }
 
@@ -119,10 +130,17 @@ public class PetPostService {
             );
         }
 
-        cloudinaryService.delete(post.getImagePublicId());
-
+        String imagePublicId = post.getImagePublicId();
         petPostRepository.delete(post);
-    }
-    
 
+        try {
+            cloudinaryService.delete(post.getImagePublicId());
+        } catch (RuntimeException ex) {
+            log.error(
+                "Failed to delete Cloudinary image: {}",
+                imagePublicId,
+                ex
+            );
+        }
+    }
 }
