@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.pawspot.exception.email.EmailAlreadyExistsException;
 import com.pawspot.exception.image.ImageUploadException;
 import com.pawspot.exception.image.ImageValidationException;
 import com.pawspot.exception.validation.PostValidationException;
@@ -90,6 +91,14 @@ public class GlobalExceptionHandler {
             .body(Map.of(
                 "message", message
             ));
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException.class)
+    public ResponseEntity<Map<String, String>> handleEmailAlreadyExists(
+        EmailAlreadyExistsException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("message", ex.getMessage()));
     }
 }
 

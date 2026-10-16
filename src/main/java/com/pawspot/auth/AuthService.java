@@ -13,6 +13,11 @@ import com.pawspot.security.JwtService;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import java.util.Locale;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import com.pawspot.exception.email.EmailAlreadyExistsException;
+
 //User registration, credential validation, and login
 @Service 
 public class AuthService {
@@ -31,22 +36,38 @@ public class AuthService {
     }
 
     public User register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+
+        String email = normalizeEmail(request.getEmail());
+
+        if (userRepository.existsByEmail(email)) {
+            throw new EmailAlreadyExistsException();
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPassword(
             passwordEncoder.encode(request.getPassword())
         );
 
-        return userRepository.save(user);
+        try {
+            return userRepository.saveAndFlush(user);
+
+        } catch (DataIntegrityViolationException ex) {
+
+            if (userRepository.existsByEmail(email)) {
+                throw new EmailAlreadyExistsException();
+            }
+
+            throw ex;
+        }
     }
 
     public LoginResult login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+
+        String email = normalizeEmail(request.getEmail());
+
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
         
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) 
@@ -66,4 +87,7 @@ public class AuthService {
         return new LoginResult(accessToken, generatedRefreshToken.token(), userResponse);
     }
 
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);//doesn't depend on the server language
+    }
 }
