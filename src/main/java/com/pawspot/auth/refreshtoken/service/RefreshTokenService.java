@@ -12,6 +12,7 @@ import com.pawspot.exception.InvalidCredentialsException;
 import com.pawspot.security.GeneratedRefreshToken;
 import com.pawspot.security.JwtService;
 import com.pawspot.user.User;
+import com.pawspot.user.UserRepository;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -25,39 +26,47 @@ public class RefreshTokenService {
     private final RotationTransactionService rotationTransactionService;
     private final RefreshSessionRepository refreshSessionRepository;
     private final LogoutTransactionService logoutTransactionService;
+    private final UserRepository userRepository;
 
     public RefreshTokenService(
         JwtService jwtService,
         RefreshTokenRepository refreshTokenRepository,
         RotationTransactionService rotationTransactionService,
         RefreshSessionRepository refreshSessionRepository,
-        LogoutTransactionService logoutTransactionService
+        LogoutTransactionService logoutTransactionService,
+        UserRepository userRepository
     ) {
         this.jwtService = jwtService;
         this.refreshTokenRepository = refreshTokenRepository;
         this.rotationTransactionService = rotationTransactionService;
         this.refreshSessionRepository = refreshSessionRepository;
         this.logoutTransactionService = logoutTransactionService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
     public GeneratedRefreshToken createSession(User user) {
 
+        User lockedUser = userRepository.findByIdForUpdate(user.getId())
+            .orElseThrow(() ->
+                new InvalidCredentialsException("Invalid credentials")
+            );
+
         // 1. Δημιουργία νέας login session
-        RefreshSession session = new RefreshSession(user);
+        RefreshSession session = new RefreshSession(lockedUser);
 
         // 2. Αποθήκευση στη βάση
         refreshSessionRepository.save(session);
 
         // 3. Δημιουργία refresh JWT με το ID της session
         GeneratedRefreshToken token = jwtService.generateRefreshToken(
-            user,
+            lockedUser,
             session.getId()
         );
 
         // 4. Αποθήκευση refresh token
         refreshTokenRepository.save(
-            RefreshToken.from(token, user)
+            RefreshToken.from(token, lockedUser)
         );
 
         return token;

@@ -31,7 +31,7 @@ public class UserDeletionTransactionService {
 
     @Transactional 
     public List<String> deleteUserData(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
             .orElseThrow();
 
         List<PetPost> posts = petPostRepository.findByUserId(userId);

@@ -54,7 +54,12 @@ public class RotationTransactionService {
             String tokenId = claims.getId();
             String familyId = claims.get("family_id", String.class);
 
-            User user = userRepository.findByEmail(email)
+            User foundUser = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                    new InvalidCredentialsException("Invalid refresh token")
+                );
+
+            User user = userRepository.findByIdForUpdate(foundUser.getId())
                 .orElseThrow(() ->
                     new InvalidCredentialsException("Invalid refresh token")
                 );
