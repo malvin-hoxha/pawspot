@@ -35,9 +35,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
@@ -89,6 +96,9 @@ class UserDeletionIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Test
     void shouldDeleteAccountAndRelatedData() {
@@ -454,8 +464,87 @@ class UserDeletionIntegrationTest {
         .andExpect(status().isConflict());
     }
 
+    @Test
+    void shouldCoordinateAccountDeletionAndRefresh() throws Exception {
+        // 1. Δημιουργία χρήστη
+        User user = new User();
+        user.setName("Concurrency User");
+        user.setEmail("concurrency-delete@test.com");
+        user.setPassword(passwordEncoder.encode("password123"));
 
+        User savedUser = userRepository.save(user);
+        Long userId = savedUser.getId();
 
+        String refreshToken = refreshTokenService
+            .createSession(savedUser)
+            .token();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch ready = new CountDownLatch(2);
+
+        AtomicReference<Future<?>> deleteFuture = new AtomicReference<>();
+        AtomicReference<Future<?>> refreshFuture = new AtomicReference<>();
+
+        try {
+            // 2. Κρατάμε κλειδωμένο τον χρήστη
+            transactionTemplate.executeWithoutResult(status -> {
+
+                userRepository.findByIdForUpdate(userId)
+                    .orElseThrow();
+
+                // 3. Ξεκινάμε δύο παράλληλες λειτουργίες
+                deleteFuture.set(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+
+                    userService.deleteAccount(userId, "password123");
+                    return null;
+                }));
+
+                refreshFuture.set(executor.submit(() -> {
+                    ready.countDown();
+                    start.await();
+
+                    try {
+                        refreshTokenService.rotate(refreshToken);
+                    } catch (InvalidCredentialsException ex) {
+                        // Επιτρεπτό: το delete μπορεί να ολοκληρωθεί πρώτο.
+                    }
+
+                    return null;
+                }));
+
+                try {
+                    assertTrue(ready.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(ex);
+                }
+
+                start.countDown();
+
+                // Με την ολοκλήρωση του callback γίνεται COMMIT
+                // και αποδεσμεύεται το User lock.
+            });
+
+            // 4. Περιμένουμε να ολοκληρωθούν και τα δύο requests
+            deleteFuture.get().get(10, TimeUnit.SECONDS);
+            refreshFuture.get().get(10, TimeUnit.SECONDS);
+
+            // 5. Έλεγχος τελικής κατάστασης
+            assertFalse(userRepository.existsById(userId));
+
+            assertFalse(refreshTokenRepository.existsByUserId(userId));
+
+            assertFalse(refreshSessionRepository.existsByUserId(userId));
+
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
 
 
 }
