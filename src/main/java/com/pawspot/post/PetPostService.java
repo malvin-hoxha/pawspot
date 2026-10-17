@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.pawspot.exception.ForbiddenOperationException;
@@ -98,6 +99,7 @@ public class PetPostService {
         return petPostRepository.findByUserId(userId);
     }
 
+    @Transactional
     public PetPost updatePost(Long id, UpdatePetPostRequest request, User user) {
         PetPost post = petPostRepository.findById(id).orElseThrow(() ->
             new PostNotFoundException("Post not found")

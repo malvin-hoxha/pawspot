@@ -33,8 +33,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -59,6 +62,12 @@ public class PetPostIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void cleanDatabase() {
@@ -439,6 +448,65 @@ public class PetPostIntegrationTest {
 
         // Το Cloudinary cleanup πρέπει να έχει επιχειρηθεί
         verify(cloudinaryService).delete("pawspot/posts/delete-failure");
+    }
+
+    
+    @Test
+    void shouldRejectStalePetPostUpdate() {
+        // 1. Δημιουργούμε χρήστη
+        User user = new User();
+        user.setName("Version Test User");
+        user.setEmail("version-test@example.com");
+        user.setPassword(passwordEncoder.encode("password123"));
+
+        User savedUser = userRepository.save(user);
+
+        // 2. Δημιουργούμε αγγελία
+        PetPost post = new PetPost();
+        post.setTitle("Lost Dog");
+        post.setDescription("Small brown dog");
+        post.setCity("Athens");
+        post.setType(PostType.LOST);
+        post.setSpecies(PetSpecies.DOG);
+        post.setUser(savedUser);
+
+        Long postId = petPostRepository.saveAndFlush(post).getId();
+
+        // 3. Διαβάζουμε την αρχική έκδοση σε ξεχωριστό transaction
+        PetPost stalePost = transactionTemplate.execute(status ->
+            petPostRepository.findById(postId).orElseThrow()
+        );
+
+        Long originalVersion = stalePost.getVersion();
+
+        // 4. Ένα άλλο transaction αλλάζει την αγγελία
+        transactionTemplate.executeWithoutResult(status -> {
+            PetPost currentPost = petPostRepository.findById(postId)
+                .orElseThrow();
+
+            currentPost.setTitle("Missing Dog");
+        });
+
+        // 5. Επιβεβαιώνουμε ότι αυξήθηκε το version
+        PetPost updatedPost = petPostRepository.findById(postId)
+            .orElseThrow();
+
+        assertEquals(originalVersion + 1, updatedPost.getVersion());
+
+        // 6. Προσπαθούμε να αποθηκεύσουμε την παλιά έκδοση
+        stalePost.setCity("Thessaloniki");
+
+        assertThrows(
+            OptimisticLockingFailureException.class,
+            () -> petPostRepository.saveAndFlush(stalePost)
+        );
+
+        // 7. Η πρώτη αλλαγή πρέπει να έχει διατηρηθεί
+        PetPost finalPost = petPostRepository.findById(postId)
+            .orElseThrow();
+
+        assertEquals("Missing Dog", finalPost.getTitle());
+        assertEquals("Athens", finalPost.getCity());
     }
 
 }
