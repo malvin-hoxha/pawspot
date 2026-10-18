@@ -31,6 +31,7 @@ public interface PetPostMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "user", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updatePostFromRequest(
         UpdatePetPostRequest request,
         @MappingTarget PetPost post
@@ -43,6 +44,7 @@ public interface PetPostMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "user", ignore = true)
+    @Mapping(target = "version", ignore = true)
     PetPost toEntity(CreatePetPostRequest request);
 
     default PageResponse<PetPostResponse> toPageResponse(

@@ -1,7 +1,6 @@
 package com.pawspot.post.response;
 
-import java.time.LocalDateTime;
-
+import java.time.Instant;
 import com.pawspot.post.enums.PetSpecies;
 import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
@@ -15,8 +14,8 @@ public class PetPostResponse {
     private String city;
     private String area;
     private PostStatus status;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
     private Long userId;
     private String userName;
     private String imageUrl;
@@ -31,8 +30,8 @@ public class PetPostResponse {
         String area,
         PostStatus status,
         String imageUrl,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt,
+        Instant createdAt,
+        Instant updatedAt,
         Long userId,
         String userName
     ) {
@@ -83,11 +82,11 @@ public class PetPostResponse {
         return status;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 

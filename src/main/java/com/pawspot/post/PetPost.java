@@ -1,5 +1,5 @@
 package com.pawspot.post;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import com.pawspot.post.enums.PetSpecies;
 import com.pawspot.post.enums.PostStatus;
@@ -67,10 +67,10 @@ public class PetPost {
     private String imagePublicId;
 
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -78,7 +78,8 @@ public class PetPost {
 
     @PrePersist
     public void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
+
         this.createdAt = now;
         this.updatedAt = now;
 
@@ -89,6 +90,6 @@ public class PetPost {
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        this.updatedAt = Instant.now();
     }
 }
