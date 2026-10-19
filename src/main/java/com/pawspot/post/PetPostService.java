@@ -71,9 +71,15 @@ public class PetPostService {
     public Page<PetPost> getPosts(PostType type, PostStatus status,
         PetSpecies species, String city, String search,int page, int size, String sortBy, String direction) {
 
-        Sort sort = direction.equalsIgnoreCase("asc")
-            ? Sort.by(sortBy).ascending()
-            : Sort.by(sortBy).descending();
+        Sort.Direction sortDirection = direction.equalsIgnoreCase("asc")
+            ? Sort.Direction.ASC
+            : Sort.Direction.DESC;
+
+        Sort sort = Sort.by(sortDirection, sortBy);
+
+        if (!sortBy.equals("id")) {
+            sort = sort.and(Sort.by(Sort.Direction.DESC, "id"));
+        }
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
@@ -95,8 +101,16 @@ public class PetPostService {
             .orElseThrow(() -> new PostNotFoundException("Post not found"));
     }
 
-    public List<PetPost> getMyPosts(Long userId) {
-        return petPostRepository.findByUserId(userId);
+    public Page<PetPost> getMyPosts(Long userId, int page, int size) {
+
+        Pageable pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+
+        return petPostRepository.findByUserId(userId, pageable);
     }
 
     @Transactional

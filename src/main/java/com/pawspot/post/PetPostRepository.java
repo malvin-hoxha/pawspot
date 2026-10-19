@@ -26,4 +26,6 @@ public interface PetPostRepository
         Specification<PetPost> spec,
         Pageable pageable
     );
+
+    Page<PetPost> findByUserId(Long userId, Pageable pageable);
 }

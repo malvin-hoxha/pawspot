@@ -1,6 +1,7 @@
 package com.pawspot.post;
 
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -8,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.pawspot.common.PageResponse;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.post.request.CreatePetPostRequest;
+import com.pawspot.post.request.MyPostsPageRequest;
 import com.pawspot.post.request.PostFilterRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.post.response.PetPostResponse;
@@ -83,15 +85,22 @@ public class PetPostController {
     }
 
     @GetMapping("/my")
-    public ResponseEntity<List<PetPostResponse>> getMyPosts(Authentication authentication) {
+    public ResponseEntity<PageResponse<PetPostResponse>> getMyPosts(
+        Authentication authentication,
+        @Valid @ModelAttribute MyPostsPageRequest request
+    ) {
         User user = (User) authentication.getPrincipal();
 
 
-        List<PetPost> posts = petPostService.getMyPosts(user.getId());
+        Page<PetPost> posts = petPostService.getMyPosts(
+            user.getId(),
+            request.getPage(),
+            request.getSize()
+        );
 
-        List<PetPostResponse> response = petPostMapper.toResponseList(posts);
-
-        return  ResponseEntity.ok(response);
+        return ResponseEntity.ok(
+            petPostMapper.toPageResponse(posts)
+        );
     }
 
     @PatchMapping("/{id}")
