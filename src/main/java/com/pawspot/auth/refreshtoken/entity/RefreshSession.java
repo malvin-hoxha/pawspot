@@ -29,10 +29,14 @@ public class RefreshSession {
 
     private Instant revokedAt;
 
-    public RefreshSession(User user) {
+    @Column(nullable = false)
+    private Instant expiresAt;
+
+    public RefreshSession(User user, Instant expiresAt) {
         this.id = UUID.randomUUID().toString();
         this.user = user;
         this.createdAt = Instant.now();
+        this.expiresAt = expiresAt;
     }
 
     public boolean isRevoked() {

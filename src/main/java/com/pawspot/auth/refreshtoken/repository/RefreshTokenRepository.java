@@ -1,10 +1,12 @@
 package com.pawspot.auth.refreshtoken.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -34,4 +36,11 @@ public interface RefreshTokenRepository
     void deleteAllByUserId(Long userId);
 
     boolean existsByUserId(Long userId);
+
+    @Modifying
+    @Query("""
+        DELETE FROM RefreshToken rt
+        WHERE rt.expiresAt < :now
+    """)
+    int deleteExpiredTokens(Instant now);
 }

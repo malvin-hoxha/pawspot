@@ -6,6 +6,7 @@ import com.pawspot.post.PetPostRepository;
 import com.pawspot.post.enums.PetSpecies;
 import com.pawspot.post.enums.PostType;
 import com.pawspot.security.JwtService;
+import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 import com.pawspot.user.UserService;
@@ -27,7 +28,6 @@ import static org.mockito.Mockito.verify;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockCookie;
@@ -36,15 +36,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import org.springframework.transaction.support.TransactionTemplate;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
@@ -57,12 +51,7 @@ import java.util.List;
 
 @AutoConfigureMockMvc
 @SpringBootTest
-@Testcontainers
-class UserDeletionIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
+class UserDeletionIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private UserService userService;
@@ -216,8 +205,8 @@ class UserDeletionIntegrationTest {
             assertTrue(userRepository.existsById(userId));
             assertTrue(petPostRepository.existsById(postId));
 
-            assertFalse(refreshTokenRepository.findAll().isEmpty());
-            assertFalse(refreshSessionRepository.findAll().isEmpty());
+            assertTrue(refreshTokenRepository.existsByUserId(userId));
+            assertTrue(refreshSessionRepository.existsByUserId(userId));
 
             // Το Cloudinary δεν πρέπει να κληθεί
             verify(cloudinaryService, never()).delete(anyString());
@@ -525,6 +514,8 @@ class UserDeletionIntegrationTest {
 
                 start.countDown();
 
+                awaitBlockedDatabaseTransactions(2);
+
                 // Με την ολοκλήρωση του callback γίνεται COMMIT
                 // και αποδεσμεύεται το User lock.
             });
@@ -543,6 +534,11 @@ class UserDeletionIntegrationTest {
         } finally {
             start.countDown();
             executor.shutdownNow();
+
+            assertTrue(
+                executor.awaitTermination(5, TimeUnit.SECONDS),
+                "Executor did not terminate within 5 seconds"
+            );
         }
     }
 

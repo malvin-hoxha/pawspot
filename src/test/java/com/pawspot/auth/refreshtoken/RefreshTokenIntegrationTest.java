@@ -3,10 +3,7 @@ package com.pawspot.auth.refreshtoken;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.pawspot.auth.refreshtoken.entity.RefreshSession;
 import com.pawspot.auth.refreshtoken.entity.RefreshToken;
@@ -14,6 +11,7 @@ import com.pawspot.auth.refreshtoken.repository.RefreshTokenRepository;
 import com.pawspot.auth.refreshtoken.service.RefreshTokenService;
 import com.pawspot.auth.response.RefreshResult;
 import com.pawspot.security.JwtService;
+import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
@@ -30,18 +28,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.concurrent.Callable;
 
 @SpringBootTest
-@Testcontainers
-class RefreshTokenIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres =
-        new PostgreSQLContainer("postgres:17");
+class RefreshTokenIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private RefreshTokenService refreshTokenService;
@@ -57,6 +47,9 @@ class RefreshTokenIntegrationTest {
 
     @Autowired
     private RefreshSessionRepository sessionRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Test
     void shouldRotateRefreshToken() {
@@ -100,7 +93,6 @@ class RefreshTokenIntegrationTest {
         user.setEmail("expiration-test@pawspot.com");
         user.setPassword("test-password");
         user = userRepository.save(user);
-
         String r1 = refreshTokenService.createSession(user).token();
 
         Claims r1Claims = jwtService.validateRefreshToken(r1);
@@ -232,16 +224,19 @@ class RefreshTokenIntegrationTest {
         user.setEmail("concurrency-test@pawspot.com");
         user.setPassword("test-password");
         user = userRepository.save(user);
+        Long userId = user.getId();
 
         // 2. Create R1
         String r1 = refreshTokenService.createSession(user).token();
 
         // 3. Prepare two threads
         ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
 
         Callable<Boolean> refreshTask = () -> {
-            start.await();
+            ready.countDown();
+            assertTrue(start.await(5, TimeUnit.SECONDS));
 
             try {
                 refreshTokenService.rotate(r1);
@@ -255,8 +250,24 @@ class RefreshTokenIntegrationTest {
             Future<Boolean> first = executor.submit(refreshTask);
             Future<Boolean> second = executor.submit(refreshTask);
 
-            // 4. Release both threads
-            start.countDown();
+            // Hold the row both rotations lock, and release it only after both
+            // transactions are confirmed waiting in PostgreSQL.
+            transactionTemplate.executeWithoutResult(status -> {
+                userRepository.findByIdForUpdate(userId).orElseThrow();
+
+                try {
+                    assertTrue(
+                        ready.await(5, TimeUnit.SECONDS),
+                        "Refresh workers were not ready"
+                    );
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(ex);
+                }
+
+                start.countDown();
+                awaitBlockedDatabaseTransactions(2);
+            });
 
             boolean result1 = first.get(15, TimeUnit.SECONDS);
             boolean result2 = second.get(15, TimeUnit.SECONDS);
@@ -287,7 +298,13 @@ class RefreshTokenIntegrationTest {
             assertEquals(2, familyTokenCount);
 
         } finally {
+            start.countDown();
             executor.shutdownNow();
+
+            assertTrue(
+                executor.awaitTermination(5, TimeUnit.SECONDS),
+                "Executor did not terminate within 5 seconds"
+            );
         }
     }
 }

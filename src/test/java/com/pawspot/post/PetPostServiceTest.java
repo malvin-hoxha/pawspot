@@ -4,8 +4,10 @@ import com.pawspot.image.CloudinaryService;
 import com.pawspot.post.mapper.PetPostMapper;
 import com.pawspot.user.User;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,9 +18,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.MockitoAnnotations;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 class PetPostServiceTest {
 
@@ -69,4 +75,66 @@ class PetPostServiceTest {
         // Δεν πρέπει να διαγραφεί η εικόνα
         verify(cloudinaryService, never()).delete(anyString());
     }
+
+    @Test
+    void shouldUseIdAsTieBreakerWhenSortingPosts() {
+
+        // Act
+        petPostService.getPosts(
+            null, null, null, null, null,
+            0, 10, "createdAt", "desc"
+        );
+
+        // Capture του Pageable που πέρασε στο repository
+        ArgumentCaptor<Pageable> pageableCaptor =
+            ArgumentCaptor.forClass(Pageable.class);
+
+        verify(petPostRepository).findAll(
+            org.mockito.ArgumentMatchers.<Specification<PetPost>>any(),
+            pageableCaptor.capture()
+        );
+
+        Pageable pageable = pageableCaptor.getValue();
+
+        // Έλεγχος του sorting
+        assertEquals(
+            Sort.Direction.DESC,
+            pageable.getSort().getOrderFor("createdAt").getDirection()
+        );
+
+        assertEquals(
+            Sort.Direction.DESC,
+            pageable.getSort().getOrderFor("id").getDirection()
+        );
+    }
+
+    @Test
+    void shouldPaginateMyPostsWithStableSorting() {
+
+        // Act
+        petPostService.getMyPosts(42L, 1, 10);
+
+        // Capture του Pageable
+        ArgumentCaptor<Pageable> pageableCaptor =
+            ArgumentCaptor.forClass(Pageable.class);
+
+        verify(petPostRepository).findByUserId(
+            eq(42L),
+            pageableCaptor.capture()
+        );
+
+        Pageable pageable = pageableCaptor.getValue();
+
+        // Pagination
+        assertEquals(1, pageable.getPageNumber());
+        assertEquals(10, pageable.getPageSize());
+
+        // Sorting
+        assertEquals(
+            Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id")),
+            pageable.getSort()
+        );
+    }
+
 }

@@ -53,16 +53,18 @@ public class RefreshTokenService {
             );
 
         // 1. Δημιουργία νέας login session
-        RefreshSession session = new RefreshSession(lockedUser);
+        RefreshSession session = new RefreshSession(lockedUser, null);
 
-        // 2. Αποθήκευση στη βάση
-        refreshSessionRepository.save(session);
-
-        // 3. Δημιουργία refresh JWT με το ID της session
+        // 2. Δημιουργία refresh JWT με το ID της session
         GeneratedRefreshToken token = jwtService.generateRefreshToken(
             lockedUser,
             session.getId()
         );
+
+        session.setExpiresAt(token.expiresAt());
+
+        // 3. Αποθήκευση στη βάση
+        refreshSessionRepository.save(session);
 
         // 4. Αποθήκευση refresh token
         refreshTokenRepository.save(

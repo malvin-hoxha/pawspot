@@ -51,13 +51,11 @@ public class JwtServiceTest {
     void shouldRejectExpiredAccessToken() throws InterruptedException {
         JwtService shortLivedJwtService = new JwtService(
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-            1000L,
+            -60_000L,
             604_800_000L
         );
 
         String token = shortLivedJwtService.generateAccessToken(user);
-
-        Thread.sleep(1500);
 
         assertThrows(JwtException.class,
             () -> shortLivedJwtService.validateAccessToken(token)

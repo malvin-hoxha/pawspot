@@ -12,8 +12,16 @@ import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
 import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
+import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
+
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,28 +36,18 @@ import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest
-@Testcontainers
-public class PetPostIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
+public class PetPostIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private PetPostService petPostService;
@@ -69,11 +67,8 @@ public class PetPostIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @BeforeEach
-    void cleanDatabase() {
-        petPostRepository.deleteAll();
-        userRepository.deleteAll();
-    }
+    @Autowired
+    private WebApplicationContext webApplicationContext;
 
     @Test
     void shouldCreatePost() {
@@ -509,4 +504,21 @@ public class PetPostIntegrationTest {
         assertEquals("Athens", finalPost.getCity());
     }
 
+    @Test
+    void shouldRejectInvalidMyPostsPageSize() throws Exception {
+
+        MockMvc mockMvc = MockMvcBuilders
+            .webAppContextSetup(webApplicationContext)
+            .apply(
+                org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()
+            )
+            .build();
+
+        mockMvc.perform(
+            get("/api/posts/my")
+                .param("size", "101")
+                .with(SecurityMockMvcRequestPostProcessors.user("test-user"))
+        )
+        .andExpect(status().isBadRequest());
+    }
 }

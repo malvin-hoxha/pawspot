@@ -6,6 +6,7 @@ import com.pawspot.auth.refreshtoken.repository.RefreshTokenRepository;
 import com.pawspot.auth.refreshtoken.service.RefreshTokenService;
 import com.pawspot.exception.InvalidCredentialsException;
 import com.pawspot.image.CloudinaryService;
+import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 import com.pawspot.user.UserService;
@@ -13,16 +14,13 @@ import com.pawspot.user.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -32,13 +30,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
-class AccountDeletionConcurrencyTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres =
-        new PostgreSQLContainer("postgres:17");
+class AccountDeletionConcurrencyTest extends PostgresIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
@@ -60,6 +52,9 @@ class AccountDeletionConcurrencyTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @MockitoBean
     private CloudinaryService cloudinaryService;
@@ -126,7 +121,18 @@ class AccountDeletionConcurrencyTest {
                 return null;
             });
 
-            startTogether(ready, start);
+            transactionTemplate.executeWithoutResult(status -> {
+                userRepository.findByIdForUpdate(userId).orElseThrow();
+
+                try {
+                    startTogether(ready, start);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(ex);
+                }
+
+                awaitBlockedDatabaseTransactions(2);
+            });
 
             deleteFuture.get(15, TimeUnit.SECONDS);
             refreshFuture.get(15, TimeUnit.SECONDS);
@@ -136,6 +142,11 @@ class AccountDeletionConcurrencyTest {
         } finally {
             start.countDown();
             executor.shutdownNow();
+
+            assertTrue(
+                executor.awaitTermination(5, TimeUnit.SECONDS),
+                "Executor did not terminate within 5 seconds"
+            );
         }
     }
 
@@ -178,7 +189,18 @@ class AccountDeletionConcurrencyTest {
                 .getStatus();
             });
 
-            startTogether(ready, start);
+            transactionTemplate.executeWithoutResult(status -> {
+                userRepository.findByIdForUpdate(userId).orElseThrow();
+
+                try {
+                    startTogether(ready, start);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(ex);
+                }
+
+                awaitBlockedDatabaseTransactions(2);
+            });
 
             deleteFuture.get(15, TimeUnit.SECONDS);
 
@@ -194,6 +216,11 @@ class AccountDeletionConcurrencyTest {
         } finally {
             start.countDown();
             executor.shutdownNow();
+
+            assertTrue(
+                executor.awaitTermination(5, TimeUnit.SECONDS),
+                "Executor did not terminate within 5 seconds"
+            );
         }
     }
 }
