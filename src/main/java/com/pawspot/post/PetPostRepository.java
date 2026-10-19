@@ -2,6 +2,8 @@ package com.pawspot.post;
 
 import java.util.List;
 
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -18,4 +20,10 @@ public interface PetPostRepository
     Page<PetPost> findByType(PostType type, Pageable pageable);
 
     List<PetPost> findByStatus(PostStatus status);
+
+    @EntityGraph(attributePaths = "user")
+    Page<PetPost> findAll(
+        Specification<PetPost> spec,
+        Pageable pageable
+    );
 }
