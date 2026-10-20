@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useLogin } from "../features/auth/hooks/useLogin";
 
 export function LoginPage() {
@@ -9,12 +9,19 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const location = useLocation();
+
+  const from = location.state?.from
+  const redirectTo = from
+    ? `${from.pathname}${from.search}${from.hash}`
+    : '/'
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
       await login.mutateAsync({ email, password });
-      navigate("/");
+      navigate(redirectTo, { replace: true })
     } catch {
       //
     }

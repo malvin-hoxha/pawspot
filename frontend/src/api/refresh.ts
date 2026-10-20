@@ -1,17 +1,20 @@
 import axios from 'axios'
 
+const authHttp = axios.create({
+  baseURL: '/api',
+  withCredentials: true,
+  withXSRFToken: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+  timeout: 10_000,
+})
+
 let refreshPromise: Promise<void> | null = null;
 let logoutInProgress = false;
 
-function performRefresh(): Promise<void> {
-    return axios.post('/api/auth/refresh', undefined, {
-        withCredentials: true,
-        withXSRFToken: true,
-        xsrfCookieName: 'XSRF-TOKEN',
-        xsrfHeaderName: 'X-XSRF-TOKEN',
-        timeout: 10_000,
-        },
-    ).then(() => undefined);
+async function performRefresh(): Promise<void> {
+  await authHttp.get('/auth/csrf')
+  await authHttp.post('/auth/refresh')
 }
 
 export function refreshSession(): Promise<void> {

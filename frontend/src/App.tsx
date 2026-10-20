@@ -1,6 +1,8 @@
 import { BrowserRouter, Link, Routes, Route } from 'react-router';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
+import { CreatePostPage } from './pages/CreatePostPage';
 
 function App() {
 
@@ -16,6 +18,9 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="*" element={<h1>404 — Page Not Found</h1>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/posts/create" element={<CreatePostPage />} />
+          </Route>
         </Routes>
       </main>
     </BrowserRouter>
