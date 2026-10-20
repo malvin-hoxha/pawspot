@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
-import { refreshSession } from './refresh'
+import { isLogoutInProgress, refreshSession } from './refresh'
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
@@ -29,31 +29,32 @@ apiClient.interceptors.response.use(response => response,
     | undefined;
 
     if (error.response?.status !== 401 || !originalRequest || originalRequest._retry 
-      || excludedPaths.has(originalRequest.url ?? '')) {
+      || excludedPaths.has(originalRequest.url ?? '') || isLogoutInProgress()) {
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
     
     try {
-      await refreshSession();
-      return apiClient(originalRequest);
+      await refreshSession()
     } catch (refreshError) {
       if (
         axios.isAxiosError(refreshError) &&
         refreshError.response?.status === 401
       ) {
-        // Οριστική αποτυχία ανανέωσης.
-        // Διατηρούμε το αρχικό 401, ώστε το useAuth()
-        // να αναγνωρίζει τον χρήστη ως unauthenticated.
         return Promise.reject(error)
       }
 
-      // Network error, timeout, 5xx, 403 κ.λπ.
-      // Δεν τα μετατρέπουμε σε unauthenticated.
       return Promise.reject(refreshError)
-        }
-      }
+    }
+
+    // Μήπως ξεκίνησε logout όσο περιμέναμε το refresh;
+    if (isLogoutInProgress()) {
+      return Promise.reject(error)
+    }
+
+    return apiClient(originalRequest)
+  },
 );
 
 /*

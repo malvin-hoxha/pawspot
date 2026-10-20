@@ -1,5 +1,6 @@
 import { apiClient } from '../../../api/client'
 import { initializeCsrf } from '../../../api/csrf'
+import { runLogout } from '../../../api/refresh'
 
 export interface AuthUser {
     id: number
@@ -38,6 +39,8 @@ export async function getCurrentUser(): Promise<AuthUser> {
 }
 
 export async function logout(): Promise<void> {
-    await initializeCsrf();
-    await apiClient.post('/auth/logout');
+  await runLogout(async () => {
+    await initializeCsrf()
+    await apiClient.post('/auth/logout')
+  })
 }

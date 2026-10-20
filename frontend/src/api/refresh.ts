@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-let refreshPromise: Promise<void> | null = null
+let refreshPromise: Promise<void> | null = null;
+let logoutInProgress = false;
 
 function performRefresh(): Promise<void> {
     return axios.post('/api/auth/refresh', undefined, {
@@ -14,6 +15,11 @@ function performRefresh(): Promise<void> {
 }
 
 export function refreshSession(): Promise<void> {
+
+    if (logoutInProgress) {
+        return Promise.reject(new Error('Logout in progress'))
+    }
+
     if (refreshPromise !== null) {
         return refreshPromise;
     }
@@ -23,4 +29,28 @@ export function refreshSession(): Promise<void> {
     });
 
     return refreshPromise;
+}
+
+export async function runLogout(logoutRequest: () => Promise<void>): Promise<void> {
+    if (logoutInProgress) {
+        return
+    }
+
+    logoutInProgress = true;
+
+    try {
+        // Περιμένουμε το ενεργό refresh να ολοκληρωθεί,
+        // είτε επιτυχημένα είτε αποτυχημένα.
+        if (refreshPromise !== null) {
+            await refreshPromise.catch(() => undefined)
+        }
+
+        await logoutRequest()
+    } finally {
+        logoutInProgress = false
+  }
+}
+
+export function isLogoutInProgress(): boolean {
+  return logoutInProgress
 }
