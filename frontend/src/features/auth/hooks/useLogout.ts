@@ -13,10 +13,12 @@ export function useLogout() {
       await queryClient.cancelQueries()
     },
 
-    onSuccess: () => {
+    onSuccess: async () => {
       // Το backend ολοκλήρωσε το logout.
       // Καθαρίζουμε όλα τα cached queries,
       // συμπεριλαμβανομένων των προσωπικών δεδομένων.
+      await queryClient.cancelQueries()
+
       queryClient.removeQueries({
         queryKey: ['posts', 'my'],
       })

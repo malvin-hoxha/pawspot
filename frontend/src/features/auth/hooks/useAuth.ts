@@ -9,7 +9,9 @@ export function useAuth() {
     return {
         user: query.data ?? null,
         isAuthenticated: query.isSuccess && query.data != null,
-        isUnauthenticated: query.isError && isUnauthorized,
+        isUnauthenticated:
+            (query.isSuccess && query.data == null) ||
+            (query.isError && isUnauthorized),
         isLoading: query.isPending,
         isError: query.isError && !isUnauthorized
     }
