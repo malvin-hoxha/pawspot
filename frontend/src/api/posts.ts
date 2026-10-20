@@ -1,3 +1,5 @@
+import { apiClient } from "./client"
+
 export interface PetPost {
   id: number
   type: 'LOST' | 'FOUND'
@@ -25,11 +27,6 @@ export interface PostsPage {
 }
 
 export async function getPosts(): Promise<PostsPage> {
-    const response = await fetch('/api/posts');
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch posts: HTTP ${response.status}`);
-    }
-
-    return response.json();
+    const response = await apiClient.get<PostsPage>('/posts')
+    return response.data
 }
