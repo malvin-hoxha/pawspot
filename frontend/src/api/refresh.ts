@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { withAuthLock } from './authLock'
+import { markAuthChanged } from './authVersion';
 
 const authHttp = axios.create({
   baseURL: '/api',
@@ -73,6 +74,7 @@ export async function runLogout(
 
     await withAuthLock(async () => {
       await logoutRequest()
+      markAuthChanged()
     })
 
   } finally {

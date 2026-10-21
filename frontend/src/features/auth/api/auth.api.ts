@@ -2,6 +2,7 @@ import { apiClient } from '../../../api/client'
 import { initializeCsrf } from '../../../api/csrf'
 import { runLogout } from '../../../api/refresh'
 import { withAuthLock } from '../../../api/authLock'
+import { markAuthChanged } from '../../../api/authVersion'
 
 export interface AuthUser {
     id: number
@@ -31,6 +32,10 @@ export async function login(input: LoginInput): Promise<AuthUser> {
       '/auth/login',
       input,
     )
+
+    // Τα cookies του νέου login έχουν παραληφθεί.
+    // Ενημερώνουμε το generation πριν αφήσουμε το Web Lock.
+    markAuthChanged()
 
     return response.data.user
   })

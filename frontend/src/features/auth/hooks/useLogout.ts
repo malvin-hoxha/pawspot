@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { logout } from '../api/auth.api'
+import { markAuthChanged } from '../../../api/authVersion'
 
 export function useLogout() {
   const queryClient = useQueryClient()
@@ -8,8 +9,7 @@ export function useLogout() {
     mutationFn: logout,
 
     onMutate: async () => {
-      // Αποτρέπουμε ενεργά queries από το να
-      // γράψουν παλιά δεδομένα στην cache.
+      markAuthChanged()
       await queryClient.cancelQueries()
     },
 

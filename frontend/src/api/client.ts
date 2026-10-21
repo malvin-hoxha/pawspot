@@ -1,9 +1,12 @@
 import axios, { AxiosError } from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import { isLogoutInProgress, refreshSession } from './refresh'
+import { queryClient } from '../app/queryClient'
+import { getAuthVersion, markAuthChanged } from './authVersion'
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
+  _authVersion?: string | null
 }
 
 export const apiClient = axios.create({
@@ -22,6 +25,16 @@ const excludedPaths = new Set([
   '/auth/logout',
 ]);
 
+apiClient.interceptors.request.use(config => {
+  const request = config as RetryableRequestConfig
+
+  if (request._authVersion === undefined) {
+    request._authVersion = getAuthVersion()
+  }
+
+  return request
+})
+
 apiClient.interceptors.response.use(response => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as 
@@ -33,6 +46,11 @@ apiClient.interceptors.response.use(response => response,
       return Promise.reject(error);
     }
 
+    // Η ταυτότητα άλλαξε πριν ξεκινήσει το refresh;
+    if (originalRequest._authVersion !== getAuthVersion()) {
+      return Promise.reject(error)
+    }
+
     originalRequest._retry = true;
     
     try {
@@ -42,14 +60,23 @@ apiClient.interceptors.response.use(response => response,
         axios.isAxiosError(refreshError) &&
         refreshError.response?.status === 401
       ) {
+        if (originalRequest._authVersion === getAuthVersion()) {
+          queryClient.setQueryData(['auth', 'me'], null)
+          queryClient.removeQueries({ queryKey: ['posts', 'my'] })
+
+          markAuthChanged()
+        }
+
         return Promise.reject(error)
       }
 
+      // Για 500, network errors κ.λπ. επιστρέφουμε
+      // το πραγματικό σφάλμα του refresh.
       return Promise.reject(refreshError)
     }
 
     // Μήπως ξεκίνησε logout όσο περιμέναμε το refresh;
-    if (isLogoutInProgress()) {
+    if (isLogoutInProgress() || originalRequest._authVersion !== getAuthVersion()) {
       return Promise.reject(error)
     }
 
