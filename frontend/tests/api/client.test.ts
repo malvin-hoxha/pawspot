@@ -50,6 +50,15 @@ beforeEach(() => {
   refreshCount = 0
   sessionRefreshed = false
   server.listen({ onUnhandledFrame: 'error' })
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    locks: {
+      request: async (
+        _name: string,
+        callback: () => Promise<void>,
+      ) => callback(),
+    },
+  })
 })
 
 afterEach(() => {
@@ -252,8 +261,9 @@ describe('Axios single-flight refresh', () => {
 
     await logout
 
-    // Το αρχικό request εκτελέστηκε μόνο μία φορά.
-    expect(originalRequestCount).toBe(1)
+    // 1 αρχικό GET + 1 session recheck μέσα στο refresh lock.
+    // Δεν έγινε τρίτο GET (retry) μετά την έναρξη logout.
+    expect(originalRequestCount).toBe(2)
     expect(refreshCount).toBe(1)
   })
 })

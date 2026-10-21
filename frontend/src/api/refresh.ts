@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { withAuthLock } from './authLock'
 
 const authHttp = axios.create({
   baseURL: '/api',
@@ -13,8 +14,30 @@ let refreshPromise: Promise<void> | null = null;
 let logoutInProgress = false;
 
 async function performRefresh(): Promise<void> {
-  await authHttp.get('/auth/csrf')
-  await authHttp.post('/auth/refresh')
+  await withAuthLock(async () => {
+    if (logoutInProgress) {
+      throw new Error('Logout in progress')
+    }
+
+    try {
+      await authHttp.get('/auth/me')
+      return
+    } catch (error) {
+      if (
+        !axios.isAxiosError(error) ||
+        error.response?.status !== 401
+      ) {
+        throw error
+      }
+    }
+
+    if (logoutInProgress) {
+      throw new Error('Logout in progress')
+    }
+
+    await authHttp.get('/auth/csrf')
+    await authHttp.post('/auth/refresh')
+  })
 }
 
 export function refreshSession(): Promise<void> {
@@ -34,23 +57,26 @@ export function refreshSession(): Promise<void> {
     return refreshPromise;
 }
 
-export async function runLogout(logoutRequest: () => Promise<void>): Promise<void> {
-    if (logoutInProgress) {
-        return
+export async function runLogout(
+  logoutRequest: () => Promise<void>
+): Promise<void> {
+  if (logoutInProgress) {
+    return
+  }
+
+  logoutInProgress = true
+
+  try {
+    if (refreshPromise !== null) {
+      await refreshPromise.catch(() => undefined)
     }
 
-    logoutInProgress = true;
+    await withAuthLock(async () => {
+      await logoutRequest()
+    })
 
-    try {
-        // Περιμένουμε το ενεργό refresh να ολοκληρωθεί,
-        // είτε επιτυχημένα είτε αποτυχημένα.
-        if (refreshPromise !== null) {
-            await refreshPromise.catch(() => undefined)
-        }
-
-        await logoutRequest()
-    } finally {
-        logoutInProgress = false
+  } finally {
+    logoutInProgress = false
   }
 }
 

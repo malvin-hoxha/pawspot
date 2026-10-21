@@ -1,6 +1,7 @@
 import { apiClient } from '../../../api/client'
 import { initializeCsrf } from '../../../api/csrf'
 import { runLogout } from '../../../api/refresh'
+import { withAuthLock } from '../../../api/authLock'
 
 export interface AuthUser {
     id: number
@@ -23,9 +24,16 @@ interface LoginResponse {
 }
 
 export async function login(input: LoginInput): Promise<AuthUser> {
+  return withAuthLock(async () => {
     await initializeCsrf()
-    const response = await apiClient.post<LoginResponse>('/auth/login', input);
-    return response.data.user;
+
+    const response = await apiClient.post<LoginResponse>(
+      '/auth/login',
+      input,
+    )
+
+    return response.data.user
+  })
 }
 
 export async function register(input: RegisterInput): Promise<void> {
