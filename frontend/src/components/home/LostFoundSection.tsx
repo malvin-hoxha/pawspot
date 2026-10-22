@@ -75,8 +75,8 @@ export function LostFoundSection() {
                     aria-hidden="true"
                     className="
                       flex h-10 w-10 shrink-0 items-center justify-center
-                      rounded-full border border-[#D8D3C6]
-                      text-lg text-[#34483D]
+                      rounded-full border border-line
+                      text-lg text-forest
                       transition-colors
                       group-hover:bg-[#25533A]
                       group-hover:text-white
@@ -86,11 +86,11 @@ export function LostFoundSection() {
                   </span>
                 </div>
 
-                <p className="mt-3 max-w-md text-sm leading-6 text-[#626C63]">
+                <p className="mt-3 max-w-md text-sm leading-6 text-muted">
                   {category.description}
                 </p>
 
-                <span className="mt-5 inline-block text-sm font-semibold text-[#34483D]">
+                <span className="mt-5 inline-block text-sm font-semibold text-forest">
                   Προβολή αγγελιών
                 </span>
               </div>

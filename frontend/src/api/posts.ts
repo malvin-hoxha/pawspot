@@ -26,15 +26,22 @@ export interface PostsPage {
   last: boolean
 }
 
-export async function getPosts(params?: {
-  page?: number,
+export interface PostFilters {
+  type?: 'LOST' | 'FOUND'
+  species?: 'DOG' | 'CAT' | 'OTHER'
+  city?: string
+  page?: number
   size?: number
   sortBy?: string
   direction?: 'asc' | 'desc'
-}): Promise<PostsPage> {
-    const response = await apiClient.get<PostsPage>('/posts', {
-      params
-    });
-    
-    return response.data
+}
+
+export async function getPosts(
+  params?: PostFilters
+): Promise<PostsPage> {
+  const response = await apiClient.get<PostsPage>('/posts', {
+    params,
+  })
+
+  return response.data
 }

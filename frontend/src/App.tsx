@@ -5,6 +5,7 @@ import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { CreatePostPage } from './pages/CreatePostPage';
 
 import { Header } from './components/layout/Header'
+import { PostsPage } from './pages/PostsPage';
 
 function App() {
 
@@ -16,6 +17,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/posts" element={<PostsPage />} />
           <Route path="*" element={<h1>404 — Page Not Found</h1>} />
           <Route element={<ProtectedRoute />}>
             <Route path="/posts/create" element={<CreatePostPage />} />

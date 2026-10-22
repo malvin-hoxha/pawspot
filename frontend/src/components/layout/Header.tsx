@@ -64,7 +64,7 @@ export function Header() {
   }
 
   return (
-    <header className="border-b border-[#D8D3C6] bg-white">
+    <header className="border-b border-line bg-white">
       <div
         className="
           mx-auto grid min-h-19 max-w-7xl
@@ -80,7 +80,7 @@ export function Header() {
             to="/"
             onClick={closeMenu}
             aria-label="PawSpot home"
-            className="flex w-fit shrink-0 items-center text-[#34483D]"
+            className="flex w-fit shrink-0 items-center text-forest"
         >
             <span
                 aria-hidden="true"
@@ -93,7 +93,7 @@ export function Header() {
             >
                 <span>P</span>
 
-                <span className="mx-[-1px] inline-flex translate-y-[2px] items-center">
+                <span className="-mx-px inline-flex translate-y-0.5 items-center">
                 <PawIcon />
             </span>
 
@@ -115,10 +115,10 @@ export function Header() {
               className={({ isActive }) => `
                 whitespace-nowrap text-[13px]
                 font-medium transition-colors
-                hover:text-[#34483D]
+                hover:text-forest
                 ${
                   isActive && link.to === '/'
-                    ? 'text-[#34483D]'
+                    ? 'text-forest'
                     : 'text-[#696C66]'
                 }
               `}
@@ -136,14 +136,14 @@ export function Header() {
             ) : isError ? (
               <Link
                 to="/login"
-                className="text-sm font-medium text-[#34483D] hover:underline"
+                className="text-sm font-medium text-forest hover:underline"
               >
                 Login
               </Link>
             ) : isAuthenticated ? (
               <>
                 <span
-                  className="hidden max-w-28 truncate text-sm text-[#626C63] xl:block"
+                  className="hidden max-w-28 truncate text-sm text-muted xl:block"
                   title={user?.name}
                 >
                   {user?.name}
@@ -154,7 +154,7 @@ export function Header() {
                   className="
                     inline-flex h-10 items-center justify-center
                     whitespace-nowrap rounded px-4
-                    bg-[#34483D] text-sm font-medium text-white
+                    bg-forest text-sm font-medium text-white
                     transition-colors hover:bg-[#26382E]
                   "
                 >
@@ -167,9 +167,9 @@ export function Header() {
                   onClick={() => logout.mutate()}
                   className="
                     h-10 whitespace-nowrap rounded
-                    border border-[#D8D3C6] px-4
-                    text-sm font-medium text-[#34483D]
-                    transition-colors hover:bg-[#F8F7F3]
+                    border border-line px-4
+                    text-sm font-medium text-forest
+                    transition-colors hover:bg-canvas
                     disabled:opacity-50
                   "
                 >
@@ -182,9 +182,9 @@ export function Header() {
                   to="/login"
                   className="
                     inline-flex h-10 items-center justify-center
-                    whitespace-nowrap rounded border border-[#34483D]
-                    px-4 text-sm font-medium text-[#34483D]
-                    transition-colors hover:bg-[#F8F7F3]
+                    whitespace-nowrap rounded border border-forest
+                    px-4 text-sm font-medium text-forest
+                    transition-colors hover:bg-canvas
                   "
                 >
                   Login
@@ -215,8 +215,8 @@ export function Header() {
           aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
           onClick={() => setMenuOpen(open => !open)}
           className="
-            justify-self-end rounded border border-[#D8D3C6]
-            px-3 py-2 text-sm text-[#34483D] md:hidden
+            justify-self-end rounded border border-line
+            px-3 py-2 text-sm text-forest md:hidden
           "
         >
           {menuOpen ? 'Close' : 'Menu'}
@@ -228,7 +228,7 @@ export function Header() {
         <nav
           id="mobile-navigation"
           aria-label="Mobile navigation"
-          className="border-t border-[#D8D3C6] px-5 py-5 md:hidden"
+          className="border-t border-line px-5 py-5 md:hidden"
         >
           <div className="flex flex-col gap-5">
             {navLinks.map(link => (
@@ -236,13 +236,13 @@ export function Header() {
                 key={link.label}
                 to={link.to}
                 onClick={closeMenu}
-                className="text-sm font-medium text-[#34483D]"
+                className="text-sm font-medium text-forest"
               >
                 {link.label}
               </Link>
             ))}
 
-            <div className="border-t border-[#D8D3C6] pt-5">
+            <div className="border-t border-line pt-5">
               {isLoading ? (
                 <AuthSkeleton />
               ) : isError ? (
@@ -251,7 +251,7 @@ export function Header() {
                 </Link>
               ) : isAuthenticated ? (
                 <div className="flex flex-col items-start gap-4">
-                  <span className="text-sm text-[#626C63]">
+                  <span className="text-sm text-muted">
                     {user?.name}
                   </span>
 
@@ -266,7 +266,7 @@ export function Header() {
                       closeMenu()
                       logout.mutate()
                     }}
-                    className="text-sm text-[#34483D]"
+                    className="text-sm text-forest"
                   >
                     Logout
                   </button>
@@ -282,7 +282,7 @@ export function Header() {
                     onClick={closeMenu}
                     className="
                       rounded bg-[#DCE9DC] px-5 py-2.5
-                      text-sm font-semibold text-[#34483D]
+                      text-sm font-semibold text-forest
                     "
                   >
                     Register

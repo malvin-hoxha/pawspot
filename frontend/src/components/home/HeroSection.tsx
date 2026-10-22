@@ -1,10 +1,35 @@
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { useState } from 'react'
 
 export function HeroSection() {
-  const [city, setCity] = useState('')
-  const [type, setType] = useState('')
-  const [species, setSpecies] = useState('')
+  const [city, setCity] = useState('');
+  const [type, setType] = useState('');
+  const [species, setSpecies] = useState('');
+
+  const navigate = useNavigate();
+
+  function handleSearch(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const params = new URLSearchParams();
+
+    if (city.trim()) {
+      params.set('city', city.trim());
+    }
+
+    if (type) {
+      params.set('type', type);
+    }
+
+    if (species) {
+      params.set('species', species);
+    }
+
+    navigate({
+      pathname: '/posts',
+      search: params.toString(),
+    });
+  }
 
   return (
     <section
@@ -16,7 +41,7 @@ export function HeroSection() {
         {/* Left content */}
         <div
           className="
-            flex min-h-[590px] flex-col justify-between
+            flex min-h-147.5 flex-col justify-between
             rounded-lg bg-white
             px-6 py-10
             sm:px-9 sm:py-14
@@ -41,7 +66,7 @@ export function HeroSection() {
               Κάθε ζωάκι αξίζει να βρει τον δρόμο για το σπίτι.
             </h1>
 
-            <p className="mt-7 max-w-md text-[15px] leading-7 text-[#626C63]">
+            <p className="mt-7 max-w-md text-[15px] leading-7 text-muted">
               Χάθηκε το κατοικίδιό σου ή βρήκες κάποιο που αναζητά
               την οικογένειά του; Μοιράσου μια αγγελία και βοήθησε
               να ξανασμίξουν.
@@ -56,7 +81,7 @@ export function HeroSection() {
 
             <div className="rounded-xl bg-[#F3F5F3] p-4 sm:p-5">
               <form
-                onSubmit={(event) => event.preventDefault()}
+                onSubmit={handleSearch}
                 className="grid gap-3 sm:grid-cols-2"
               >
                 {/* City */}
@@ -102,7 +127,7 @@ export function HeroSection() {
 
                 {/* Species */}
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm text-[#626C63]">
+                  <span className="text-sm text-muted">
                     Είδος ζώου
                   </span>
 
@@ -135,11 +160,11 @@ export function HeroSection() {
               </form>
             </div>
 
-            <p className="mt-5 text-sm text-[#626C63]">
+            <p className="mt-5 text-sm text-muted">
               Έχεις πληροφορίες για κάποιο κατοικίδιο;{' '}
               <Link
                 to="/posts/create"
-                className="font-semibold text-[#34483D] underline underline-offset-4"
+                className="font-semibold text-forest underline underline-offset-4"
               >
                 Δημιούργησε αγγελία
               </Link>
@@ -150,9 +175,9 @@ export function HeroSection() {
         {/* Right image */}
         <div
           className="
-            relative min-h-[360px] overflow-hidden
+            relative min-h-90 overflow-hidden
             rounded-lg bg-[#E8ECE6]
-            lg:min-h-[590px]
+            lg:min-h-147.5
           "
         >
           <img
@@ -164,7 +189,7 @@ export function HeroSection() {
           <div
             className="
               absolute inset-x-0 bottom-0
-              bg-gradient-to-t from-black/55 to-transparent
+              bg-linear-to-t from-black/55 to-transparent
               px-8 pt-24 pb-8 text-white
             "
           >
