@@ -39,7 +39,7 @@ export function LostFoundSection() {
           Μια μικρή βοήθεια μπορεί να κάνει μεγάλη διαφορά.
         </h2>
 
-        <p className="mt-4 text-base leading-7 text-[#626C63]">
+        <p className="mt-4 text-base leading-7 text-muted">
           Κάθε αγγελία είναι μια ευκαιρία να ξαναβρεθεί ένα κατοικίδιο
           με την οικογένειά του.
         </p>
@@ -49,10 +49,10 @@ export function LostFoundSection() {
         {categories.map(category => (
           <article
             key={category.href}
-            className="group overflow-hidden rounded-lg bg-[#F8F7F3]"
+            className="group overflow-hidden rounded-lg border border-[#E5E7E2] bg-white"
           >
             <Link to={category.href} className="block">
-              <div className="aspect-[16/10] overflow-hidden bg-[#E8ECE6]">
+              <div className="aspect-16/10 overflow-hidden bg-[#E8ECE6]">
                 <img
                   src={category.image}
                   alt={category.alt}

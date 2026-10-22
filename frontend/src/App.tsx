@@ -4,14 +4,13 @@ import { HomePage } from './pages/HomePage';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { CreatePostPage } from './pages/CreatePostPage';
 
+import { Header } from './components/layout/Header'
+
 function App() {
 
   return (
     <BrowserRouter>
-      <nav className="flex gap-4 border-b p-4">
-        <Link to="/" className="hover:underline">Home</Link>
-        <Link to="/login" className="hover:underline">Login</Link>
-      </nav>
+      <Header />
 
       <main className="p-6">
         <Routes>

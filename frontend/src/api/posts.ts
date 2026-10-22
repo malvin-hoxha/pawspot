@@ -26,7 +26,15 @@ export interface PostsPage {
   last: boolean
 }
 
-export async function getPosts(): Promise<PostsPage> {
-    const response = await apiClient.get<PostsPage>('/posts')
+export async function getPosts(params?: {
+  page?: number,
+  size?: number
+  sortBy?: string
+  direction?: 'asc' | 'desc'
+}): Promise<PostsPage> {
+    const response = await apiClient.get<PostsPage>('/posts', {
+      params
+    });
+    
     return response.data
 }
