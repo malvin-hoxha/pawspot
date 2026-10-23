@@ -43,5 +43,10 @@ export async function getPosts(
     params,
   })
 
-  return response.data
+  return response.data;
+}
+
+export async function getPost(id:Number):Promise<PetPost> {
+  const response = await apiClient.get<PetPost>(`/posts/${id}`);
+  return response.data;
 }

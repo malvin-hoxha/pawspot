@@ -6,6 +6,7 @@ import { CreatePostPage } from './pages/CreatePostPage';
 
 import { Header } from './components/layout/Header'
 import { PostsPage } from './pages/PostsPage';
+import { PostDetailsPage } from './pages/PostDetailsPage'
 
 function App() {
 
@@ -18,6 +19,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/posts" element={<PostsPage />} />
+          <Route path="/posts/:id" element={<PostDetailsPage />} />
           <Route path="*" element={<h1>404 — Page Not Found</h1>} />
           <Route element={<ProtectedRoute />}>
             <Route path="/posts/create" element={<CreatePostPage />} />
