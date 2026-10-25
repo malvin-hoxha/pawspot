@@ -1,15 +1,14 @@
-
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { useAuth } from '../../features/auth/hooks/useAuth'
 import { useLogout } from '../../features/auth/hooks/useLogout'
 
 const navLinks = [
-  { label: 'Home', to: '/' },
-  { label: 'Lost Pets', to: '/#lost' },
-  { label: 'Found Pets', to: '/#found' },
-  { label: 'Latest Posts', to: '/#latest' },
-]
+  { label: 'Αρχική', to: '/' },
+  { label: 'Χαμένα', to: '/posts?type=LOST' },
+  { label: 'Βρέθηκαν', to: '/posts?type=FOUND' },
+  { label: 'Πρόσφατες αγγελίες', to: '/posts' },
+];
 
 
 function PawIcon() {
@@ -55,12 +54,23 @@ function AuthSkeleton() {
 }
 
 export function Header() {
-  const { user, isAuthenticated, isLoading, isError } = useAuth()
-  const logout = useLogout()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const { user, isAuthenticated, isLoading, isError } = useAuth();
+  const logout = useLogout();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const location = useLocation();
+  const activeType = new URLSearchParams(location.search).get('type');
+
+  function isNavActive(to: string) {
+    if (to === '/') return location.pathname === '/';
+    if (location.pathname !== '/posts') return false;
+
+    const linkType = new URLSearchParams(to.split('?')[1] ?? '').get('type');
+    return linkType === activeType;
+  }
 
   function closeMenu() {
-    setMenuOpen(false)
+    setMenuOpen(false);
   }
 
   return (
@@ -107,25 +117,23 @@ export function Header() {
           aria-label="Main navigation"
           className="hidden items-center justify-center gap-7 md:flex lg:gap-9"
         >
-          {navLinks.map(link => (
-            <NavLink
-              key={link.label}
-              to={link.to}
-              end={link.to === '/'}
-              className={({ isActive }) => `
-                whitespace-nowrap text-[13px]
-                font-medium transition-colors
-                hover:text-forest
-                ${
-                  isActive && link.to === '/'
-                    ? 'text-forest'
-                    : 'text-[#696C66]'
-                }
-              `}
-            >
-              {link.label}
-            </NavLink>
-          ))}
+          {navLinks.map(link => {
+            const active = isNavActive(link.to)
+
+            return (
+              <Link
+                key={link.label}
+                to={link.to}
+                aria-current={active ? 'page' : undefined}
+                className={`
+                  whitespace-nowrap text-[13px] transition-colors hover:text-forest
+                  ${active ? 'font-semibold text-forest' : 'font-medium text-[#696C66]'}
+                `}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
 
         {/* Desktop account actions */}
@@ -138,16 +146,23 @@ export function Header() {
                 to="/login"
                 className="text-sm font-medium text-forest hover:underline"
               >
-                Login
+                Σύνδεση
               </Link>
             ) : isAuthenticated ? (
               <>
-                <span
-                  className="hidden max-w-28 truncate text-sm text-muted xl:block"
-                  title={user?.name}
+                <div
+                  className="flex shrink-0 items-center gap-2"
+                  aria-label={`Συνδεδεμένος ως ${user?.name ?? 'χρήστης'}`}
                 >
-                  {user?.name}
-                </span>
+                  <span className="relative flex size-9 items-center justify-center rounded-full bg-[#DCE9DC] text-sm font-bold text-forest">
+                    {user?.name?.charAt(0).toLocaleUpperCase('el') ?? 'Χ'}
+                    <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-green-600 ring-2 ring-white" />
+                  </span>
+                </div>
+
+                <Link to="/posts/my" className="text-sm font-medium text-forest hover:underline">
+                  Οι αγγελίες μου
+                </Link>
 
                 <Link
                   to="/posts/create"
@@ -158,7 +173,7 @@ export function Header() {
                     transition-colors hover:bg-[#26382E]
                   "
                 >
-                  Create Post
+                  Νέα αγγελία
                 </Link>
 
                 <button
@@ -170,10 +185,10 @@ export function Header() {
                     border border-line px-4
                     text-sm font-medium text-forest
                     transition-colors hover:bg-canvas
-                    disabled:opacity-50
+                    disabled:opacity-50 cursor-pointer
                   "
                 >
-                  {logout.isPending ? 'Logging out...' : 'Logout'}
+                  {logout.isPending ? 'Αποσύνδεση...' : 'Αποσύνδεση'}
                 </button>
               </>
             ) : (
@@ -187,7 +202,7 @@ export function Header() {
                     transition-colors hover:bg-canvas
                   "
                 >
-                  Login
+                  Σύνδεση
                 </Link>
 
                 <Link
@@ -200,7 +215,7 @@ export function Header() {
                     hover:bg-[#26382E]
                   "
                 >
-                  Register
+                  Εγγραφή
                 </Link>
               </>
             )}
@@ -219,7 +234,7 @@ export function Header() {
             px-3 py-2 text-sm text-forest md:hidden
           "
         >
-          {menuOpen ? 'Close' : 'Menu'}
+          {menuOpen ? 'Κλείσιμο' : 'Μενού'}
         </button>
       </div>
 
@@ -247,16 +262,20 @@ export function Header() {
                 <AuthSkeleton />
               ) : isError ? (
                 <Link to="/login" onClick={closeMenu}>
-                  Login
+                  Σύνδεση
                 </Link>
               ) : isAuthenticated ? (
                 <div className="flex flex-col items-start gap-4">
-                  <span className="text-sm text-muted">
-                    {user?.name}
+                  <span className="text-sm font-medium text-forest">
+                    Συνδεδεμένος ως {user?.name}
                   </span>
 
+                  <Link to="/posts/my" onClick={closeMenu}>
+                    Οι αγγελίες μου
+                  </Link>
+
                   <Link to="/posts/create" onClick={closeMenu}>
-                    Create Post
+                    Νέα αγγελία
                   </Link>
 
                   <button
@@ -266,15 +285,15 @@ export function Header() {
                       closeMenu()
                       logout.mutate()
                     }}
-                    className="text-sm text-forest"
+                    className="text-sm text-forest cursor-pointer"
                   >
-                    Logout
+                    Αποσύνδεση
                   </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-start gap-4">
                   <Link to="/login" onClick={closeMenu}>
-                    Login
+                    Σύνδεση
                   </Link>
 
                   <Link
@@ -285,7 +304,7 @@ export function Header() {
                       text-sm font-semibold text-forest
                     "
                   >
-                    Register
+                    Εγγραφή
                   </Link>
                 </div>
               )}
