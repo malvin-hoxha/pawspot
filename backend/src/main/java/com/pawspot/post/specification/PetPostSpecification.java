@@ -6,6 +6,7 @@ import com.pawspot.post.PetPost;
 import com.pawspot.post.enums.PetSpecies;
 import com.pawspot.post.enums.PostStatus;
 import com.pawspot.post.enums.PostType;
+import java.util.Locale;
 
 public class PetPostSpecification {
 
@@ -42,9 +43,27 @@ public class PetPostSpecification {
             }
 
             if (city != null && !city.isBlank()) {
+                var storedCity = criteriaBuilder.function(
+                    "unaccent",
+                    String.class,
+                    criteriaBuilder.lower(criteriaBuilder.trim(root.get("city")))
+                );
+
+                var requestedCity = criteriaBuilder.function(
+                    "unaccent",
+                    String.class,
+                    criteriaBuilder.literal(city.trim().toLowerCase(Locale.ROOT))
+                );
+
                 predicate = criteriaBuilder.and(
                     predicate,
-                    criteriaBuilder.equal(root.get("city"), city)
+                    criteriaBuilder.like(
+                        storedCity,
+                        criteriaBuilder.concat(
+                            criteriaBuilder.concat("%", requestedCity),
+                            "%"
+                        )
+                    )
                 );
             }
 
