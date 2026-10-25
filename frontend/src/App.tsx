@@ -1,4 +1,4 @@
-import { BrowserRouter, Link, Routes, Route } from 'react-router';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
@@ -7,6 +7,9 @@ import { CreatePostPage } from './pages/CreatePostPage';
 import { Header } from './components/layout/Header'
 import { PostsPage } from './pages/PostsPage';
 import { PostDetailsPage } from './pages/PostDetailsPage'
+
+import { MyPostsPage } from './pages/MyPostsPage';
+import { EditPostPage } from './pages/EditPostPage';
 
 function App() {
 
@@ -23,6 +26,8 @@ function App() {
           <Route path="*" element={<h1>404 — Page Not Found</h1>} />
           <Route element={<ProtectedRoute />}>
             <Route path="/posts/create" element={<CreatePostPage />} />
+            <Route path="/posts/my" element={<MyPostsPage />} />
+            <Route path="/posts/:id/edit" element={<EditPostPage />} />
           </Route>
         </Routes>
       </main>
