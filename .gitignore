@@ -37,3 +37,5 @@ build/
 .env
 pawspot-test-credentials.env
 tmp/
+
+/frontend/public/images/
