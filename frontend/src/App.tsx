@@ -10,6 +10,7 @@ import { PostDetailsPage } from './pages/PostDetailsPage'
 
 import { MyPostsPage } from './pages/MyPostsPage';
 import { EditPostPage } from './pages/EditPostPage';
+import { RegisterPage } from './pages/RegisterPage';
 
 function App() {
 
@@ -21,6 +22,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/posts" element={<PostsPage />} />
           <Route path="/posts/:id" element={<PostDetailsPage />} />
           <Route path="*" element={<h1>404 — Page Not Found</h1>} />
