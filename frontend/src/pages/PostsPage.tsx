@@ -9,10 +9,12 @@ export function PostsPage() {
     
     const [searchParams, setSearchParams] = useSearchParams();
     const type = searchParams.get('type');
-    const species = searchParams.get('species')
+    const species = searchParams.get('species');
     const city = searchParams.get('city')?.trim() || undefined;
-    const pageParam = searchParams.get('page')
-    const parsedPage = Number(pageParam ?? '0')
+    const pageParam = searchParams.get('page');
+    const parsedPage = Number(pageParam ?? '0');
+
+    const search = searchParams.get('search')?.trim() || undefined;
 
     const page = Number.isSafeInteger(parsedPage) && parsedPage >= 0
         ? parsedPage
@@ -27,6 +29,7 @@ export function PostsPage() {
         type: validType,
         species: validSpecies,
         city,
+        search: search,
         page: page,
         size: 12,
         sortBy: 'createdAt',

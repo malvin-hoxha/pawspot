@@ -30,6 +30,7 @@ export interface PostFilters {
   type?: 'LOST' | 'FOUND'
   species?: 'DOG' | 'CAT' | 'OTHER'
   city?: string
+  search?: string
   page?: number
   size?: number
   sortBy?: string

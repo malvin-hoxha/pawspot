@@ -68,19 +68,34 @@ public class PetPostSpecification {
             }
 
             if (search != null && !search.isBlank()) {
-                String pattern = "%" + search.toLowerCase() + "%";
+                var requestedSearch = criteriaBuilder.function(
+                    "unaccent",
+                    String.class,
+                    criteriaBuilder.literal(search.trim().toLowerCase(Locale.ROOT))
+                );
+
+                var pattern = criteriaBuilder.concat(
+                    criteriaBuilder.concat("%", requestedSearch),
+                    "%"
+                );
+
+                var title = criteriaBuilder.function(
+                    "unaccent",
+                    String.class,
+                    criteriaBuilder.lower(root.get("title"))
+                );
+
+                var description = criteriaBuilder.function(
+                    "unaccent",
+                    String.class,
+                    criteriaBuilder.lower(root.get("description"))
+                );
 
                 predicate = criteriaBuilder.and(
                     predicate,
                     criteriaBuilder.or(
-                        criteriaBuilder.like(
-                            criteriaBuilder.lower(root.get("title")),
-                            pattern
-                        ),
-                        criteriaBuilder.like(
-                            criteriaBuilder.lower(root.get("description")),
-                            pattern
-                        )
+                        criteriaBuilder.like(title, pattern),
+                        criteriaBuilder.like(description, pattern)
                     )
                 );
             }
