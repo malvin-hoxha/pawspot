@@ -1,83 +1,96 @@
-import { useState } from "react";
-import { useLocation, useNavigate } from "react-router";
-import { useLogin } from "../features/auth/hooks/useLogin";
+import { useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
+import axios from 'axios'
+import { useLogin } from '../features/auth/hooks/useLogin'
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useLogin();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const location = useLocation();
-
-  const from = location.state?.from
+  const from = location.state?.from;
   const redirectTo = from
     ? `${from.pathname}${from.search}${from.hash}`
-    : '/'
+    : '/';
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  const invalidCredentials = axios.isAxiosError(login.error) &&
+    login.error.response?.status === 401;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     try {
-      await login.mutateAsync({ email, password });
-      navigate(redirectTo, { replace: true })
+      await login.mutateAsync({ email: email.trim(), password });
+      navigate(redirectTo, { replace: true });
     } catch {
-      //
+      // Το μήνυμα εμφανίζεται μέσω του login.isError.
     }
   }
 
   return (
-    <main className="mx-auto max-w-md space-y-6">
-      <h1 className="text-3xl font-bold">Login</h1>
+    <section className="mx-auto max-w-md py-12">
+      <h1 className="font-serif text-4xl text-forest">Σύνδεση</h1>
+      <p className="mt-3 text-muted">
+        Καλώς ήρθες ξανά στο PawSpot.
+      </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block mb-1">
-            Email
-          </label>
+      <form
+        onSubmit={handleSubmit}
+        className="mt-8 space-y-5 rounded-lg border border-line bg-white p-6"
+      >
+        <label className="block text-sm font-medium text-forest">
+          Email
           <input
-            id="email"
             type="email"
             autoComplete="email"
             required
             value={email}
             onChange={event => setEmail(event.target.value)}
-            className="w-full rounded border p-2"
+            className="mt-2 h-11 w-full rounded-md border border-line px-3 focus:outline-none focus:ring-2 focus:ring-[#52715C]"
           />
-        </div>
+        </label>
 
-        <div>
-          <label htmlFor="password" className="block mb-1">
-            Password
-          </label>
+        <label className="block text-sm font-medium text-forest">
+          Κωδικός
           <input
-            id="password"
             type="password"
             autoComplete="current-password"
             required
             value={password}
             onChange={event => setPassword(event.target.value)}
-            className="w-full rounded border p-2"
+            className="mt-2 h-11 w-full rounded-md border border-line px-3 focus:outline-none focus:ring-2 focus:ring-[#52715C]"
           />
-        </div>
+        </label>
 
         {login.isError && (
-          <p role="alert" className="text-red-600">
-            Login failed. Check your credentials and try again.
+          <p role="alert" className="text-sm text-red-700">
+            {invalidCredentials
+              ? 'Λάθος email ή κωδικός. Δοκίμασε ξανά.'
+              : 'Δεν ήταν δυνατή η σύνδεση. Προσπάθησε ξανά.'}
           </p>
         )}
 
         <button
           type="submit"
           disabled={login.isPending}
-          className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+          className="h-11 w-full rounded-md bg-forest font-semibold text-white transition-colors hover:bg-[#26382E] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {login.isPending ? 'Signing in...' : 'Login'}
+          {login.isPending ? 'Σύνδεση...' : 'Σύνδεση'}
         </button>
       </form>
-    </main>
+
+      <p className="mt-6 text-center text-sm text-muted">
+        Δεν έχεις λογαριασμό;{' '}
+        <Link to="/register" className="font-semibold text-forest underline">
+          Εγγραφή
+        </Link>
+      </p>
+    </section>
   )
+
 }
 
 /*
