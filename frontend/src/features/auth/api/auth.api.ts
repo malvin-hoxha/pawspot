@@ -1,8 +1,8 @@
 import { apiClient } from '../../../api/client'
 import { initializeCsrf } from '../../../api/csrf'
-import { runLogout } from '../../../api/refresh'
 import { withAuthLock } from '../../../api/authLock'
 import { markAuthChanged } from '../../../api/authVersion'
+import { refreshSession, runLogout } from '../../../api/refresh'
 
 export interface AuthUser {
     id: number
@@ -56,4 +56,18 @@ export async function logout(): Promise<void> {
     await initializeCsrf()
     await apiClient.post('/auth/logout')
   })
+}
+
+export async function deleteAccount(password:string):Promise<void> {
+  // Βεβαιωνόμαστε ότι υπάρχει έγκυρη συνεδρία πριν τη διαγραφή.
+  await refreshSession()
+
+  // Όσο γίνεται η διαγραφή, ένα 401 για λάθος κωδικό
+  // δεν πρέπει να ξεκινήσει νέο refresh.
+  await runLogout(async () => {
+    await initializeCsrf();
+    await apiClient.delete('/users/me', {
+      data: { password },
+    });
+  });
 }

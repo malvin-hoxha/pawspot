@@ -150,7 +150,8 @@ export function Header() {
               </Link>
             ) : isAuthenticated ? (
               <>
-                <div
+                <Link
+                  to={"/account"}
                   className="flex shrink-0 items-center gap-2"
                   aria-label={`Συνδεδεμένος ως ${user?.name ?? 'χρήστης'}`}
                 >
@@ -158,7 +159,7 @@ export function Header() {
                     {user?.name?.charAt(0).toLocaleUpperCase('el') ?? 'Χ'}
                     <span className="absolute bottom-0 right-0 size-2.5 rounded-full bg-green-600 ring-2 ring-white" />
                   </span>
-                </div>
+                </Link>
 
                 <Link to="/posts/my" className="text-sm font-medium text-forest hover:underline">
                   Οι αγγελίες μου

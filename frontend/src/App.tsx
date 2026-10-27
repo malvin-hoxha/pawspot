@@ -12,6 +12,7 @@ import { PostDetailsPage } from './pages/PostDetailsPage'
 import { MyPostsPage } from './pages/MyPostsPage';
 import { EditPostPage } from './pages/EditPostPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { AccountPage } from './pages/AccountPage';
 
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
             <Route path="/posts/create" element={<CreatePostPage />} />
             <Route path="/posts/my" element={<MyPostsPage />} />
             <Route path="/posts/:id/edit" element={<EditPostPage />} />
+            <Route path="/account" element={<AccountPage />} />
           </Route>
         </Routes>
       </main>
