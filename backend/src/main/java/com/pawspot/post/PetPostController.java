@@ -1,7 +1,6 @@
 package com.pawspot.post;
 
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,8 +15,6 @@ import com.pawspot.post.response.PetPostResponse;
 import com.pawspot.user.User;
 
 import jakarta.validation.Valid;
-
-import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
