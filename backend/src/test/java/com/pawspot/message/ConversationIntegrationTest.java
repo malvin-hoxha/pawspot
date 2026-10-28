@@ -31,8 +31,25 @@ import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+
+import org.springframework.http.MediaType;
+
 
 @SpringBootTest
+@AutoConfigureMockMvc
 public class ConversationIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     private ConversationService conversationService;
@@ -51,6 +68,9 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private MessageRepository messageRepository;
+
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
     void shouldReturnSameConversationForConcurrentStarts() throws Exception {
@@ -264,5 +284,142 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
         post.setStatus(PostStatus.ACTIVE);
         post.setUser(owner);
         return petPostRepository.saveAndFlush(post);
+    }
+
+    @Test
+    void shouldRequireAuthenticationToReadConversations() throws Exception {
+        mockMvc.perform(get("/api/conversations/1"))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/conversations/1/messages"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectInvalidMessagePagination() throws Exception {
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        PetPost post = createPost(owner);
+
+        var conversation = conversationService.startConversation(
+            post.getId(),
+            interested
+        );
+
+        var auth = new UsernamePasswordAuthenticationToken(
+            interested,
+            null,
+            List.of()
+        );
+
+        int[][] invalidPagination = {
+            {-1, 50},
+            {0, 0},
+            {0, 101}
+        };
+
+        for (int[] parameters : invalidPagination) {
+            mockMvc.perform(
+                get("/api/conversations/{id}/messages", conversation.id())
+                    .with(authentication(auth))
+                    .param("page", String.valueOf(parameters[0]))
+                    .param("size", String.valueOf(parameters[1]))
+            )
+            .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void shouldSendAndReadMessagesThroughEndpoints() throws Exception {
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        PetPost post = createPost(owner);
+
+        var conversation = conversationService.startConversation(
+            post.getId(), interested
+        );
+
+        var interestedAuth = new UsernamePasswordAuthenticationToken(
+            interested, null, List.of()
+        );
+
+        var ownerAuth = new UsernamePasswordAuthenticationToken(
+            owner, null, List.of()
+        );
+
+        mockMvc.perform(
+            post("/api/conversations/{id}/messages", conversation.id())
+                .with(authentication(interestedAuth))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"body": "Το είδα στο πάρκο"}
+                    """)
+        )
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.senderId").value(interested.getId()))
+        .andExpect(jsonPath("$.body").value("Το είδα στο πάρκο"));
+
+        // The owner should see the interested user as the other participant.
+        mockMvc.perform(
+            get("/api/conversations/{id}", conversation.id())
+                .with(authentication(ownerAuth))
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.otherUserId").value(interested.getId()));
+
+        mockMvc.perform(
+            get("/api/conversations/{id}/messages", conversation.id())
+                .with(authentication(ownerAuth))
+                .param("page", "0")
+                .param("size", "1")
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].body").value("Το είδα στο πάρκο"))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(1))
+        .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void shouldRejectNonParticipantThroughEndpoints() throws Exception {
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        User stranger = createUser("Stranger", "stranger@test.com");
+        PetPost post = createPost(owner);
+
+        var conversation = conversationService.startConversation(
+            post.getId(), interested
+        );
+
+        var strangerAuth = new UsernamePasswordAuthenticationToken(
+            stranger, null, List.of()
+        );
+
+        mockMvc.perform(
+            get("/api/conversations/{id}", conversation.id())
+                .with(authentication(strangerAuth))
+        )
+        .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+            get("/api/conversations/{id}/messages", conversation.id())
+                .with(authentication(strangerAuth))
+        )
+        .andExpect(status().isNotFound());
+
+        mockMvc.perform(
+            post("/api/conversations/{id}/messages", conversation.id())
+                .with(authentication(strangerAuth))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"body": "Unauthorized message"}
+                    """)
+        )
+        .andExpect(status().isNotFound());
+
+        assertEquals(0L, messageRepository.count());
     }
 }
