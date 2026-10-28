@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.pawspot.exception.ForbiddenOperationException;
 import com.pawspot.exception.PostNotFoundException;
 import com.pawspot.message.Conversation;
+import com.pawspot.message.Message;
 import com.pawspot.message.mapper.ConversationMapper;
 import com.pawspot.message.repositories.ConversationRepository;
 import com.pawspot.message.repositories.MessageRepository;
@@ -107,6 +108,41 @@ public class ConversationService {
 
         return conversationMapper.toResponse(newConversation, post.getUser());
         
+    }
+
+    @Transactional
+    public MessageResponse sendMessage(Long conversationId, User currentUser, String body) {
+        Conversation conversation = requireParticipant(conversationId, currentUser.getId());
+
+        if (body == null || body.isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Message cannot be blank"
+            );
+        }
+
+        String text = body.trim();
+
+        if (text.length() > 2000) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Message cannot exceed 2000 characters"
+            );
+        }
+
+        Message message = new Message();
+        message.setConversation(conversation);
+        message.setSender(currentUser);
+        message.setBody(text);
+        messages.save(message);
+
+        return new MessageResponse(
+            message.getId(),
+            message.getSender().getId(),
+            message.getSender().getName(),
+            message.getBody(),
+            message.getCreatedAt()
+        );
     }
 
     private Conversation requireParticipant(Long conversationId, Long userId) {
