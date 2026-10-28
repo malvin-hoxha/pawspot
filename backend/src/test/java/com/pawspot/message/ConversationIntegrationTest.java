@@ -293,6 +293,9 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
 
         mockMvc.perform(get("/api/conversations/1/messages"))
             .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/conversations"))
+            .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -422,4 +425,110 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
 
         assertEquals(0L, messageRepository.count());
     }
+
+    @Test
+    void shouldStartConversationOnceThroughEndpoint() throws Exception {
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        PetPost post = createPost(owner);
+
+        var auth = new UsernamePasswordAuthenticationToken(
+            interested, null, List.of()
+        );
+
+        var firstResult = mockMvc.perform(
+            post("/api/posts/{id}/conversations", post.getId())
+                .with(authentication(auth))
+                .with(csrf())
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.postId").value(post.getId()))
+        .andExpect(jsonPath("$.otherUserId").value(owner.getId()))
+        .andReturn();
+
+        Conversation stored = conversationRepository
+            .findByPostIdAndInterestedUserId(post.getId(), interested.getId())
+            .orElseThrow();
+
+        jsonPath("$.id").value(stored.getId()).match(firstResult);
+
+        mockMvc.perform(
+            post("/api/posts/{id}/conversations", post.getId())
+                .with(authentication(auth))
+                .with(csrf())
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(stored.getId()));
+
+        assertEquals(1L, conversationRepository.count());
+    }
+
+    @Test
+    void shouldListOnlyCurrentUsersConversationsWithPagination() throws Exception {
+        User viewer = createUser("Viewer", "viewer@test.com");
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        User stranger = createUser("Stranger", "stranger@test.com");
+
+        PetPost viewersPost = createPost(viewer);
+        PetPost ownersPost = createPost(owner);
+
+        // The viewer participates as the post owner.
+        var firstConversation = conversationService.startConversation(
+            viewersPost.getId(), interested
+        );
+
+        // The viewer participates as the interested user.
+        var secondConversation = conversationService.startConversation(
+            ownersPost.getId(), viewer
+        );
+
+        // This conversation must not appear in the viewer's inbox.
+        conversationService.startConversation(ownersPost.getId(), interested);
+
+        var viewerAuth = new UsernamePasswordAuthenticationToken(
+            viewer, null, List.of()
+        );
+
+        mockMvc.perform(
+            get("/api/conversations")
+                .with(authentication(viewerAuth))
+                .param("page", "0")
+                .param("size", "1")
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(secondConversation.id()))
+        .andExpect(jsonPath("$.content[0].otherUserId").value(owner.getId()))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(
+            get("/api/conversations")
+                .with(authentication(viewerAuth))
+                .param("page", "1")
+                .param("size", "1")
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(firstConversation.id()))
+        .andExpect(jsonPath("$.content[0].otherUserId").value(interested.getId()))
+        .andExpect(jsonPath("$.page").value(1))
+        .andExpect(jsonPath("$.totalElements").value(2));
+
+        var strangerAuth = new UsernamePasswordAuthenticationToken(
+            stranger, null, List.of()
+        );
+
+        mockMvc.perform(
+            get("/api/conversations")
+                .with(authentication(strangerAuth))
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0))
+        .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+
 }

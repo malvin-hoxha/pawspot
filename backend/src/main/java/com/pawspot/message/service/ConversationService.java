@@ -145,6 +145,33 @@ public class ConversationService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public Page<ConversationResponse> getConversations(
+        Long userId,
+        int page,
+        int size
+    ) {
+        var pageable = PageRequest.of(
+            page,
+            size,
+            Sort.by(Sort.Direction.DESC, "createdAt")
+                .and(Sort.by(Sort.Direction.DESC, "id"))
+        );
+
+        return conversations.findInbox(userId, pageable)
+            .map(conversation -> {
+                User postOwner = conversation.getPost().getUser();
+                User interestedUser = conversation.getInterestedUser();
+                User otherUser = userId.equals(postOwner.getId())
+                    ? interestedUser
+                    : postOwner;
+
+                return conversationMapper.toResponse(conversation, otherUser);
+
+            });
+
+    }
+
     private Conversation requireParticipant(Long conversationId, Long userId) {
         Conversation conversation = conversations.findById(conversationId).orElseThrow(this::notFound);
 

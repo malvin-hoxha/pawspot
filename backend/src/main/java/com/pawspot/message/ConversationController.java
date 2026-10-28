@@ -42,6 +42,22 @@ public class ConversationController {
         this.conversationMapper = conversationMapper;
     }
 
+    @GetMapping
+    public ResponseEntity<PageResponse<ConversationResponse>> getConversations(
+        Authentication authentication,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
+    ) {
+        User user = (User) authentication.getPrincipal();
+        Page<ConversationResponse> convercations = conversationService
+            .getConversations(user.getId(), page, size);
+
+        return ResponseEntity.ok(
+            conversationMapper.toConversationPageResponse(convercations)
+        );
+
+    }
+
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<MessageResponse> sendMessage(
         @PathVariable Long conversationId,
@@ -81,6 +97,9 @@ public class ConversationController {
 
         return ResponseEntity.ok(conversationMapper.toPageResponse(messages));
     }
+
+    
+
     
     
 }

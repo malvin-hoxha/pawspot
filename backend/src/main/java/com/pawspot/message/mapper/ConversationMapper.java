@@ -21,7 +21,32 @@ public interface ConversationMapper {
     @Mapping(source = "conversation.createdAt", target = "createdAt")
     ConversationResponse toResponse(Conversation conversation, User otherUser);
 
-    @Mapping(source = "number", target = "page")
-    PageResponse<MessageResponse> toPageResponse(Page<MessageResponse> messages);
+    default PageResponse<MessageResponse> toPageResponse(
+        Page<MessageResponse> messages
+    ) {
+        return new PageResponse<>(
+            messages.getContent(),
+            messages.getNumber(),
+            messages.getSize(),
+            messages.getTotalElements(),
+            messages.getTotalPages(),
+            messages.isFirst(),
+            messages.isLast()
+        );
+    }
+
+    default PageResponse<ConversationResponse> toConversationPageResponse(
+        Page<ConversationResponse> conversations
+    ) {
+        return new PageResponse<>(
+            conversations.getContent(),
+            conversations.getNumber(),
+            conversations.getSize(),
+            conversations.getTotalElements(),
+            conversations.getTotalPages(),
+            conversations.isFirst(),
+            conversations.isLast()
+        );
+    }
 }
 
