@@ -1,8 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Link, useParams, useNavigate } from 'react-router'
 import { getPost } from '../api/posts'
+import { startConversation } from '../api/messages'
+import { useAuth } from '../features/auth/hooks/useAuth'
 
 export function PostDetailsPage() {
+
+    const navigate = useNavigate();
+    
     const { id } = useParams();
     const postId = Number(id);
 
@@ -14,6 +19,12 @@ export function PostDetailsPage() {
         enabled: isValidId,
         staleTime: 60_000,
         retry: false,
+    });
+
+    const { user, isAuthenticated } = useAuth()
+
+    const contact = useMutation({
+        mutationFn: startConversation,
     });
 
     if (!isValidId) {
@@ -147,6 +158,29 @@ export function PostDetailsPage() {
                             {post.description}
                         </p>
                     </div>
+
+                    {isAuthenticated && user && user.id !== post.userId && post.status === 'ACTIVE' && (
+                        <div className="mt-8">
+                            <button
+                                type="button"
+                                disabled={contact.isPending}
+                                onClick={() =>
+                                    contact.mutate(postId, {
+                                        onSuccess: (conversation) => navigate(`/messages/${conversation.id}`),
+                                    })
+                                }
+                                className="rounded-md bg-[#25533A] px-5 py-3 text-sm font-medium text-white hover:bg-[#1E432E] disabled:opacity-50"
+                            >
+                                {contact.isPending ? 'Άνοιγμα συζήτησης…' : 'Επικοινωνία'}
+                            </button>
+
+                            {contact.isError && (
+                                <p role="alert" className="mt-2 text-sm text-red-700">
+                                    Δεν ήταν δυνατό το άνοιγμα της συζήτησης. Προσπάθησε ξανά.
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </section>
