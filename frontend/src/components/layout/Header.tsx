@@ -7,7 +7,7 @@ const navLinks = [
   { label: 'Αρχική', to: '/' },
   { label: 'Χαμένα', to: '/posts?type=LOST' },
   { label: 'Βρέθηκαν', to: '/posts?type=FOUND' },
-  { label: 'Πρόσφατες αγγελίες', to: '/posts' },
+  { label: 'Μηνύματα', to: '/messages' },
 ];
 
 

@@ -13,6 +13,8 @@ import { MyPostsPage } from './pages/MyPostsPage';
 import { EditPostPage } from './pages/EditPostPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { AccountPage } from './pages/AccountPage';
+import { ConversationPage } from './pages/ConversationPage';
+import { MessagesPage } from './pages/MessagesPage';
 
 
 function App() {
@@ -39,6 +41,8 @@ function App() {
             <Route path="/posts/my" element={<MyPostsPage />} />
             <Route path="/posts/:id/edit" element={<EditPostPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/messages/:id" element={<ConversationPage />} />
+            <Route path="/messages" element={<MessagesPage />} />
           </Route>
         </Routes>
       </main>
