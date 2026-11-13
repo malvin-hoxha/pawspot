@@ -37,13 +37,16 @@ export async function getConversation(
     return response.data;
 }
 
-export async function getMessages(conversationId: number) {
-  const response = await apiClient.get<{ content: MessageResponse[] }>(
-    `/conversations/${conversationId}/messages`,
-    { params: { page: 0, size: 50 } },
+export async function getMessages(conversationId: number, page: number) {
+  const response = await apiClient.get<{ 
+        content: MessageResponse[]
+        page: number
+        last: boolean 
+    }>(`/conversations/${conversationId}/messages`,{ 
+        params: { page, size: 20 } },
   )
 
-  return response.data.content
+  return response.data;
 }
 
 export async function sendMessage(
