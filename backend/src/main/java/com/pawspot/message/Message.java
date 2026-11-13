@@ -2,6 +2,9 @@ package com.pawspot.message;
 
 import java.time.Instant;
 
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import com.pawspot.user.User;
 
 import jakarta.persistence.Column;
@@ -30,6 +33,7 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "conversation_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Conversation conversation;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

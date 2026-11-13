@@ -2,6 +2,9 @@ package com.pawspot.message;
 
 import java.time.Instant;
 
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import com.pawspot.post.PetPost;
 import com.pawspot.user.User;
 
@@ -38,10 +41,12 @@ public class Conversation {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "post_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private PetPost post;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "interested_user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User interestedUser;
 
     @Column(nullable = false)

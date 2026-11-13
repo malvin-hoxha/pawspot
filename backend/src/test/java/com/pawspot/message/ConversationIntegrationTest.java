@@ -47,6 +47,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.springframework.http.MediaType;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import com.pawspot.image.CloudinaryService;
+import com.pawspot.post.PetPostService;
+import com.pawspot.user.UserService;
+
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -71,6 +80,18 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private PetPostService petPostService;
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @MockitoBean
+    private CloudinaryService cloudinaryService;
 
     @Test
     void shouldReturnSameConversationForConcurrentStarts() throws Exception {
@@ -530,5 +551,76 @@ public class ConversationIntegrationTest extends PostgresIntegrationTest {
         .andExpect(jsonPath("$.totalElements").value(0));
     }
 
+    @Test
+    void shouldDeleteConversationsAndMessagesWhenPostIsDeleted() {
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+        PetPost post = createPost(owner);
+
+        var conversation = conversationService.startConversation(
+            post.getId(), interested
+        );
+        var message = conversationService.sendMessage(
+            conversation.id(), interested, "I saw your dog."
+        );
+
+        petPostService.deletePost(post.getId(), owner);
+
+        assertFalse(petPostRepository.existsById(post.getId()));
+        assertFalse(conversationRepository.existsById(conversation.id()));
+        assertFalse(messageRepository.existsById(message.id()));
+    }
+
+    @Test
+    void shouldDeleteOnlyConversationsInvolvingDeletedAccount() {
+        String password = "test-password";
+
+        User account = createUser("Account", "account@test.com");
+        account.setPassword(passwordEncoder.encode(password));
+        account = userRepository.saveAndFlush(account);
+
+        User owner = createUser("Owner", "owner@test.com");
+        User interested = createUser("Interested", "interested@test.com");
+
+        PetPost accountsPost = createPost(account);
+        PetPost ownersPost = createPost(owner);
+
+        // Ο λογαριασμός που διαγράφεται είναι ο δημιουργός της αγγελίας.
+        var ownedConversation = conversationService.startConversation(
+            accountsPost.getId(), interested
+        );
+        var ownedMessage = conversationService.sendMessage(
+            ownedConversation.id(), interested, "Is the dog still missing?"
+        );
+
+        // Ο ίδιος λογαριασμός συμμετέχει ως ενδιαφερόμενος σε ξένη αγγελία.
+        var joinedConversation = conversationService.startConversation(
+            ownersPost.getId(), account
+        );
+        var joinedMessage = conversationService.sendMessage(
+            joinedConversation.id(), account, "I might have seen the dog."
+        );
+
+        // Μια άσχετη συζήτηση στην ίδια ξένη αγγελία πρέπει να παραμείνει.
+        var unrelatedConversation = conversationService.startConversation(
+            ownersPost.getId(), interested
+        );
+        var unrelatedMessage = conversationService.sendMessage(
+            unrelatedConversation.id(), owner, "Thanks for reaching out."
+        );
+
+        userService.deleteAccount(account.getId(), password);
+
+        assertFalse(userRepository.existsById(account.getId()));
+        assertFalse(petPostRepository.existsById(accountsPost.getId()));
+        assertFalse(conversationRepository.existsById(ownedConversation.id()));
+        assertFalse(conversationRepository.existsById(joinedConversation.id()));
+        assertFalse(messageRepository.existsById(ownedMessage.id()));
+        assertFalse(messageRepository.existsById(joinedMessage.id()));
+
+        assertTrue(petPostRepository.existsById(ownersPost.getId()));
+        assertTrue(conversationRepository.existsById(unrelatedConversation.id()));
+        assertTrue(messageRepository.existsById(unrelatedMessage.id()));
+    }
 
 }
