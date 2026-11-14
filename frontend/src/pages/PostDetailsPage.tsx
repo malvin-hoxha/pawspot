@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router'
 import { getPost } from '../api/posts'
 import { startConversation } from '../api/messages'
 import { useAuth } from '../features/auth/hooks/useAuth'
+import { PostReportForm } from '../components/posts/PostReportForm'
 
 export function PostDetailsPage() {
 
@@ -179,6 +180,12 @@ export function PostDetailsPage() {
                                     Δεν ήταν δυνατό το άνοιγμα της συζήτησης. Προσπάθησε ξανά.
                                 </p>
                             )}
+                        </div>
+                    )}
+
+                    {isAuthenticated && (
+                        <div className="mt-6">
+                            <PostReportForm key={post.id} postId={post.id} />
                         </div>
                     )}
                 </div>
