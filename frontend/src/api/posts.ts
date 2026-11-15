@@ -102,6 +102,8 @@ export async function createPost(input: CreatePostInput): Promise<PetPost> {
 
   formData.append('image', input.image);
 
-  const response = await apiClient.post<PetPost>('/posts', formData)
+  const response = await apiClient.post<PetPost>('/posts', formData, {
+    timeout: 60_000
+  })
   return response.data
 }

@@ -1,23 +1,37 @@
 # PawSpot
 
-A full-stack application for reporting lost and found pets. Visitors can browse listings without an account, while authenticated users can publish posts with a photo and manage their own listings.
+PawSpot is a full-stack lost-and-found pet platform. Visitors can browse public listings, open listing details, and search by category, location, species, or keyword. Signed-in users can publish and manage photo listings, contact another listing's owner through private conversations, submit reports on listings for future review, and manage their account. The interface is primarily in Greek.
 
-Built as a personal project with **Java, Spring Boot, React, TypeScript and PostgreSQL**. The interface is primarily in Greek.
+**Main technologies:** Java 17, Spring Boot, Spring Security, PostgreSQL, React, TypeScript, Vite, Tailwind CSS, TanStack Query, and Cloudinary.
 
-**Status:** In active development. Browsing, login and post management are available in the frontend. Registration and account deletion are implemented in the backend; their frontend flows are still planned.
+![PawSpot home page](docs/screenshots/00-landing-page.png)
+
+## More screenshots
+
+<table>
+  <tr>
+    <td width="25%"><img src="docs/screenshots/01-listings.png" alt="Public lost-and-found listings with category, city, species, and keyword filters"></td>
+    <td width="25%"><img src="docs/screenshots/02-post-details.png" alt="Lost-pet listing details with photo, location, description, contact action, and report action"></td>
+    <td width="25%"><img src="docs/screenshots/03-conversation.png" alt="Private conversation between a listing owner and an interested user"></td>
+    <td width="25%"><img src="docs/screenshots/04-create-post.png" alt="Create-listing form with the selected pet photo preview"></td>
+  </tr>
+  <tr>
+    <td align="center">Public listings</td>
+    <td align="center">Listing details</td>
+    <td align="center">Private conversation</td>
+    <td align="center">Create listing and photo preview</td>
+  </tr>
+</table>
 
 ## Features
 
-- **Lost and found listings:** Create posts with a photo, location, pet species and description; edit details, mark a post as resolved or delete it.
-- **Search and filtering:** Browse paginated results by lost/found category, species and city. City matching supports partial, case-insensitive and accent-insensitive searches. Filters and page selection are stored in the URL.
-- **Ownership-based authorization:** Users can edit and delete only their own posts, with access checks enforced by the backend.
-- **Cookie-based authentication:** JWT access and refresh tokens in HTTP-only cookies, BCrypt password hashing and CSRF protection.
-- **Refresh-token lifecycle:** Token rotation, reuse detection, refresh-session revocation and scheduled cleanup of expired token records.
-- **Authentication across tabs:** Web Locks coordinate authentication operations, while shared identity tracking prevents stale requests from being retried under a different user.
-- **Image storage:** Cloudinary uploads with file validation and cleanup when posts are deleted.
-- **Account deletion API:** Password confirmation before removing the user, posts and refresh-session records, followed by image-cleanup attempts.
-
-The backend also supports keyword search over titles and descriptions, plus status filtering and sorting. The keyword-search input is not yet connected to the frontend.
+- **Public lost-and-found listings:** Anyone can browse paginated listings and view their photos, location, species, status, description, and author.
+- **Search and filters:** The listings screen supports lost/found category, species, partial city matching, and keyword search across titles and descriptions. Filters and pagination are stored in the URL; the API also supports status, sorting, and page-size parameters.
+- **Photo listing management:** Signed-in users can create a listing with a validated image and preview, edit its details or status, and delete it. Images are stored in Cloudinary.
+- **Accounts:** Visitors can register and sign in through the UI. Users can delete their account after password confirmation; their listings and refresh-session data are removed as part of that flow.
+- **Private messaging:** An interested user can open one private conversation per listing, both participants can exchange messages, and older messages are loaded when the conversation history is scrolled upward.
+- **Post reports:** Signed-in users can select a reason, add an optional description, and submit a listing report. Reports are stored as pending for future review; admin review and moderation are not implemented yet.
+- **Cookie-based authentication:** JWT access and refresh tokens use HTTP-only cookies, with BCrypt password hashing and CSRF protection for state-changing requests.
 
 ## Tech stack
 
@@ -34,10 +48,12 @@ The backend also supports keyword search over titles and descriptions, plus stat
 
 ## Implementation highlights
 
-- **Composable database filters:** [JPA Specifications](backend/src/main/java/com/pawspot/post/specification/PetPostSpecification.java) combine optional filters and use PostgreSQL `unaccent` for city matching. Pagination adds an ID tie-breaker to keep ordering stable.
-- **Transactional token rotation:** [Refresh-token rotation](backend/src/main/java/com/pawspot/auth/refreshtoken/service/RotationTransactionService.java) locks the user and refresh-session rows before updating token state. Reusing a revoked refresh token revokes its session and token family.
-- **Coordinated frontend authentication:** The [API client](frontend/src/api/client.ts) retries an eligible request once after refresh, with identity checks before and after refresh. [Web Locks](frontend/src/api/authLock.ts) serialize authentication operations across tabs.
-- **Database and image consistency:** If saving a new post fails after an image upload, the service attempts to remove that image. Database deletion happens before external image cleanup; cleanup failures are logged.
+- **Refresh-token rotation and reuse detection:** [Rotation runs transactionally](backend/src/main/java/com/pawspot/auth/refreshtoken/service/RotationTransactionService.java), locking the user and refresh-session rows. Reuse of a revoked token revokes its session and token family.
+- **Authorization at the service layer:** [Post mutations verify ownership](backend/src/main/java/com/pawspot/post/PetPostService.java), while [conversation reads and writes verify participation](backend/src/main/java/com/pawspot/message/service/ConversationService.java) without exposing whether another user's conversation exists.
+- **Duplicate-conversation prevention:** Conversation creation locks the listing before checking for an existing participant/listing pair, and a [database unique constraint](backend/src/main/java/com/pawspot/message/Conversation.java) provides a second guard against duplicates.
+- **Composable database filters:** [JPA Specifications](backend/src/main/java/com/pawspot/post/specification/PetPostSpecification.java) combine optional filters and use PostgreSQL `unaccent` for city matching. Pagination adds an ID tie-breaker for stable ordering.
+- **Coordinated browser authentication:** The [API client](frontend/src/api/client.ts) retries an eligible request once after refresh with identity checks, while [Web Locks](frontend/src/api/authLock.ts) serialize authentication operations across tabs.
+- **Database and image consistency:** If saving a new listing fails after upload, the service attempts to remove the Cloudinary image. Listing deletion commits the database operation before attempting external image cleanup.
 
 ## Run locally
 
@@ -123,24 +139,7 @@ Open **http://localhost:5173**. Vite proxies `/api` requests to the backend on p
 
 ### 5. Create a local account
 
-Until the registration page is added, register through the API. With both servers running, fetch a CSRF cookie and send its value in the registration request:
-
-```bash
-curl --fail --silent --show-error \
-  --cookie-jar /tmp/pawspot-cookies.txt \
-  http://localhost:5173/api/auth/csrf
-
-CSRF_TOKEN="$(awk '$6 == "XSRF-TOKEN" {print $7}' /tmp/pawspot-cookies.txt)"
-
-curl --fail --show-error \
-  --cookie /tmp/pawspot-cookies.txt \
-  -H "Content-Type: application/json" \
-  -H "X-XSRF-TOKEN: $CSRF_TOKEN" \
-  --data '{"name":"Local User","email":"local@example.com","password":"LocalDev123!"}' \
-  http://localhost:5173/api/auth/register
-```
-
-Then open `/login` in the browser and sign in with that local account. A fresh database starts without posts; creating a post requires valid Cloudinary credentials.
+With both servers running, open **http://localhost:5173/register** and create an account, then sign in at `/login`. A fresh database starts without listings; creating one requires valid Cloudinary credentials.
 
 The default cookie settings are intended for local HTTP development. An HTTPS deployment requires secure cookies and deployment-specific configuration.
 
@@ -154,7 +153,7 @@ From `backend/`:
 ./mvnw test
 ```
 
-Integration tests use a separate PostgreSQL 17 Testcontainer and test-only configuration. Docker must be running. Coverage includes post authorization and validation, refresh-token rotation and reuse, account deletion and concurrent database operations.
+Integration tests use a separate PostgreSQL 17 Testcontainer and test-only configuration. Docker must be running. Coverage includes post authorization and validation, refresh-token rotation and reuse, account deletion, messaging and duplicate-conversation prevention, report submission, and concurrent database operations.
 
 ### Frontend unit and integration tests
 
@@ -168,7 +167,7 @@ These tests cover API-client behavior and authentication hooks, including delaye
 
 ### Browser tests
 
-Keep the backend and Vite development server running. Create two distinct local test accounts through the registration API, then run the following from `frontend/`:
+Keep the backend and Vite development server running. Use the registration page to create two distinct local test accounts, then run the following from `frontend/`:
 
 ```bash
 npx playwright install chromium
@@ -179,7 +178,7 @@ export E2E_USER_B_PASSWORD='replace-with-second-test-password'
 npx playwright test
 ```
 
-Use the actual credentials of the two accounts you created. Playwright does not start the application servers or register these users automatically. The suite exercises concurrent refresh, cross-tab logout, expired sessions and retries after an identity change.
+Use the actual credentials of the two accounts you created. Playwright does not start the application servers or register these users automatically. The suite exercises concurrent refresh, cross-tab logout, expired sessions, and retries after an identity change.
 
 ## API overview
 
@@ -191,32 +190,41 @@ Use the actual credentials of the two accounts you created. Playwright does not 
 | `POST` | `/api/auth/refresh` | Rotate a valid refresh token |
 | `POST` | `/api/auth/logout` | Revoke the refresh session and clear cookies |
 | `GET` | `/api/auth/me` | Get the authenticated user |
-| `GET` | `/api/posts` | Public, filtered and paginated listings |
-| `GET` | `/api/posts/{id}` | Public post details |
-| `POST` | `/api/posts` | Authenticated; multipart fields and `image` |
-| `GET` | `/api/posts/my` | Authenticated user's posts |
+| `GET` | `/api/posts` | Public, filtered, sorted, and paginated listings |
+| `GET` | `/api/posts/{id}` | Public listing details |
+| `POST` | `/api/posts` | Authenticated; multipart listing fields and `image` |
+| `GET` | `/api/posts/my` | Authenticated user's listings |
 | `PATCH` | `/api/posts/{id}` | Owner only; partial JSON update |
 | `DELETE` | `/api/posts/{id}` | Owner only |
+| `POST` | `/api/posts/{postId}/conversations` | Authenticated non-owner; open or return the existing conversation |
+| `GET` | `/api/conversations` | Participant's paginated conversation inbox |
+| `GET` | `/api/conversations/{conversationId}` | Participant only; conversation details |
+| `GET` | `/api/conversations/{conversationId}/messages` | Participant only; paginated message history |
+| `POST` | `/api/conversations/{conversationId}/messages` | Participant only; send a message |
+| `POST` | `/api/posts/{postId}/reports` | Authenticated; submit a report for review |
 | `DELETE` | `/api/users/me` | Authenticated; password confirmation in JSON |
 
 State-changing requests require a valid CSRF token, including registration and login. Browser requests use cookies and the `X-XSRF-TOKEN` header.
 
-Listing query parameters: `type`, `status`, `species`, `city`, `search`, `page`, `size`, `sortBy` and `direction`. Pagination is zero-based; page size defaults to 10 and is limited to 100.
+Listing query parameters: `type`, `status`, `species`, `city`, `search`, `page`, `size`, `sortBy`, and `direction`. Pagination is zero-based; page size defaults to 10 and is limited to 100.
 
 ## Project structure
 
 | Path | Contents |
 | --- | --- |
-| `backend/src/main/java/com/pawspot/` | Authentication, security, posts, users, image storage and exception handling |
+| `backend/src/main/java/com/pawspot/auth/` | Authentication and refresh-token lifecycle |
+| `backend/src/main/java/com/pawspot/post/` | Listings, filters, ownership checks, and persistence |
+| `backend/src/main/java/com/pawspot/message/` | Private conversations, messages, and participant checks |
+| `backend/src/main/java/com/pawspot/report/` | Report submission and pending report records |
+| `backend/src/main/java/com/pawspot/user/` | Account data and deletion flow |
 | `backend/src/test/` | Unit and PostgreSQL integration tests |
-| `frontend/src/api/` | HTTP client, CSRF and refresh coordination |
-| `frontend/src/features/auth/` | Authentication API functions, hooks and route protection |
-| `frontend/src/pages/` | Browsing, post management and login pages |
-| `frontend/tests/` | API-client, authentication and browser tests |
+| `frontend/src/api/` | HTTP client plus auth, listing, messaging, and reporting requests |
+| `frontend/src/features/auth/` | Authentication functions, hooks, and route protection |
+| `frontend/src/pages/` | Public browsing and authenticated account, listing, and messaging screens |
+| `frontend/src/components/posts/` | Listing cards, filters, and report form |
+| `frontend/tests/` | API-client, authentication, and browser tests |
 | `docker-compose.yml` | Local PostgreSQL service |
 
 ## Next steps
 
-- Connect keyword search to the frontend filters.
-- Add registration and account-deletion screens, and improve the login experience.
-- Add private communication between a listing's owner and interested users.
+- Build an admin report queue with review decisions and listing moderation tools.
