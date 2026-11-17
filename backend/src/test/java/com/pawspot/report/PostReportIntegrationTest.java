@@ -28,6 +28,13 @@ import com.pawspot.support.PostgresIntegrationTest;
 import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+
+import com.pawspot.security.JwtService;
+import com.pawspot.user.enums.UserRole;
+
+import jakarta.servlet.http.Cookie;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 class PostReportIntegrationTest extends PostgresIntegrationTest {
@@ -46,6 +53,13 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
     private User reporter;
     private Long postId;
+
+    @Autowired
+    private JwtService jwtService;
+
+    private Cookie accessCookie(User user) {
+        return new Cookie("accessToken", jwtService.generateAccessToken(user));
+    }
 
     @BeforeEach
     void createPostAndReporter() {
@@ -126,5 +140,92 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
         user.setEmail(email);
         user.setPassword("test-password");
         return users.save(user);
+    }
+
+    @Test
+    void shouldRestrictReportQueueToAdmins() throws Exception {
+        mockMvc.perform(get("/api/admin/post-reports"))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/admin/post-reports")
+                .cookie(accessCookie(reporter)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnEmptyThenPopulatedReportQueueForAdmin() throws Exception {
+        User admin = createUser("Admin", "admin@test.com");
+        admin.setRole(UserRole.ADMIN);
+        admin = users.saveAndFlush(admin);
+        Cookie cookie = accessCookie(admin);
+
+        mockMvc.perform(get("/api/admin/post-reports").cookie(cookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content").isArray())
+            .andExpect(jsonPath("$.content.length()").value(0));
+
+        PostReport saved = reports.save(new PostReport(
+            posts.findById(postId).orElseThrow(),
+            reporter,
+            ReportReason.SPAM,
+            "Repeated listing"
+        ));
+
+        mockMvc.perform(get("/api/admin/post-reports").cookie(cookie))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(saved.getId()))
+            .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+            .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void shouldDismissReportAsAdmin() throws Exception {
+        User admin = createUser("Admin", "admin@test.com");
+        admin.setRole(UserRole.ADMIN);
+        admin = users.saveAndFlush(admin);
+
+        PostReport report = reports.saveAndFlush(
+            new PostReport(
+                posts.findById(postId).orElseThrow(),
+                reporter,
+                ReportReason.SPAM,
+                "Repeated listing"
+            )
+        );
+
+        mockMvc.perform(
+                post("/api/admin/post-reports/{reportId}/dismiss", report.getId())
+                    .cookie(accessCookie(admin))
+                    .with(csrf())
+            )
+            .andExpect(status().isNoContent());
+
+        PostReport updated = reports.findById(report.getId()).orElseThrow();
+
+        assertEquals(ReportStatus.DISMISSED, updated.getStatus());
+    }
+
+    @Test
+    void shouldRejectDismissalByRegularUser() throws Exception {
+        PostReport report = reports.saveAndFlush(
+            new PostReport(
+                posts.findById(postId).orElseThrow(),
+                reporter,
+                ReportReason.SPAM,
+                "Repeated listing"
+            )
+        );
+
+        mockMvc.perform(
+                post("/api/admin/post-reports/{reportId}/dismiss", report.getId())
+                    .cookie(accessCookie(reporter))
+                    .with(csrf())
+            )
+            .andExpect(status().isForbidden());
+
+        PostReport unchanged = reports.findById(report.getId()).orElseThrow();
+
+        assertEquals(ReportStatus.PENDING, unchanged.getStatus());
     }
 }

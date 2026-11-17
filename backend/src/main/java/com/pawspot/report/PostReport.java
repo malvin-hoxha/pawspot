@@ -24,8 +24,10 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-@Getter 
+@Getter
+@Setter 
 @NoArgsConstructor
 @Entity 
 @Table(name = "post_reports")
