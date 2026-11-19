@@ -38,6 +38,7 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sender_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User sender;
 
     @Column(nullable = false, length = 2000)
