@@ -45,6 +45,10 @@ public abstract class PostgresIntegrationTest {
             "Refusing to truncate a non-test database"
         );
 
+        integrationTestJdbcTemplate.execute(
+            "CREATE EXTENSION IF NOT EXISTS unaccent"
+        );
+        
         integrationTestJdbcTemplate.execute("""
             TRUNCATE TABLE
                 refresh_tokens,
