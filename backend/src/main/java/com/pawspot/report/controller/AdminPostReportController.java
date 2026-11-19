@@ -6,12 +6,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pawspot.common.PageResponse;
 import com.pawspot.report.PostReportService;
 import com.pawspot.report.response.PostReportResponse;
+import com.pawspot.user.User;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,6 +54,18 @@ public class AdminPostReportController {
         postReportService.dismissReport(reportId);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{reportId}/remove-post")
+    public ResponseEntity<Void> removeReportedPost(
+        @PathVariable Long reportId,
+        Authentication authentication
+    ) {
+        
+        User admin = (User) authentication.getPrincipal();
+        postReportService.removeReportedPost(reportId, admin);
+        return ResponseEntity.noContent().build();
+    }
+    
     
     
 }

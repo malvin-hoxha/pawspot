@@ -1,6 +1,11 @@
 package com.pawspot.report;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,8 +21,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import com.pawspot.image.CloudinaryService;
 import com.pawspot.post.PetPost;
 import com.pawspot.post.PetPostRepository;
 import com.pawspot.post.enums.PetSpecies;
@@ -56,6 +65,15 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private JwtService jwtService;
+
+    @MockitoBean
+    private CloudinaryService cloudinaryService;
+
+    @Autowired
+    private PostReportService postReportService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private Cookie accessCookie(User user) {
         return new Cookie("accessToken", jwtService.generateAccessToken(user));
@@ -227,5 +245,108 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
         PostReport unchanged = reports.findById(report.getId()).orElseThrow();
 
         assertEquals(ReportStatus.PENDING, unchanged.getStatus());
+    }
+
+    @Test
+    void shouldRemovePostAndResolveItsPendingReportsAsAdmin() throws Exception {
+        User admin = createUser("Admin", "admin@test.com");
+        admin.setRole(UserRole.ADMIN);
+        admin = users.saveAndFlush(admin);
+
+        PetPost post = posts.findById(postId).orElseThrow();
+        post.setImagePublicId("pawspot/posts/reported-post");
+        posts.saveAndFlush(post);
+
+        PostReport firstReport = reports.saveAndFlush(
+            new PostReport(post, reporter, ReportReason.SPAM, "Repeated listing")
+        );
+
+        PostReport secondReport = reports.saveAndFlush(
+            new PostReport(post, reporter, ReportReason.SPAM, "Another report")
+        );
+
+        mockMvc.perform(
+                post(
+                    "/api/admin/post-reports/{reportId}/remove-post",
+                    firstReport.getId()
+                )
+                    .cookie(accessCookie(admin))
+                    .with(csrf())
+            )
+            .andExpect(status().isNoContent());
+
+        assertFalse(posts.existsById(postId));
+
+        for (Long reportId : List.of(firstReport.getId(), secondReport.getId())) {
+            PostReport updated = reports.findById(reportId).orElseThrow();
+
+            assertEquals(ReportStatus.POST_REMOVED, updated.getStatus());
+            assertEquals(postId, updated.getReportedPostId());
+            assertNull(updated.getPost());
+        }
+
+        verify(cloudinaryService).delete("pawspot/posts/reported-post");
+    }
+
+    @Test
+    void shouldRejectPostRemovalByRegularUser() throws Exception {
+        PostReport report = reports.saveAndFlush(
+            new PostReport(
+                posts.findById(postId).orElseThrow(),
+                reporter,
+                ReportReason.SPAM,
+                "Repeated listing"
+            )
+        );
+
+        mockMvc.perform(
+                post(
+                    "/api/admin/post-reports/{reportId}/remove-post",
+                    report.getId()
+                )
+                    .cookie(accessCookie(reporter))
+                    .with(csrf())
+            )
+            .andExpect(status().isForbidden());
+
+        assertTrue(posts.existsById(postId));
+
+        PostReport unchanged = reports.findById(report.getId()).orElseThrow();
+        assertEquals(ReportStatus.PENDING, unchanged.getStatus());
+
+        verifyNoInteractions(cloudinaryService);
+    }
+
+    @Test
+    void shouldRollbackPostRemovalWithoutDeletingImage() {
+        User admin = createUser("Admin", "admin@test.com");
+        admin.setRole(UserRole.ADMIN);
+        users.saveAndFlush(admin);
+
+        PostReport report = reports.saveAndFlush(
+            new PostReport(
+                posts.findById(postId).orElseThrow(),
+                reporter,
+                ReportReason.SPAM,
+                "Repeated listing"
+            )
+        );
+
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+
+        transaction.executeWithoutResult(status -> {
+            postReportService.removeReportedPost(report.getId(), admin);
+
+            // Execute the database changes before deliberately rolling them back.
+            reports.flush();
+            status.setRollbackOnly();
+        });
+
+        assertTrue(posts.existsById(postId));
+
+        PostReport restored = reports.findById(report.getId()).orElseThrow();
+        assertEquals(ReportStatus.PENDING, restored.getStatus());
+
+        verifyNoInteractions(cloudinaryService);
     }
 }
