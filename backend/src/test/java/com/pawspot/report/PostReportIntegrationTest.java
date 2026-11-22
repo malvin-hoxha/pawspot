@@ -43,6 +43,8 @@ import com.pawspot.security.JwtService;
 import com.pawspot.user.enums.UserRole;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -348,5 +350,26 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
         assertEquals(ReportStatus.PENDING, restored.getStatus());
 
         verifyNoInteractions(cloudinaryService);
+    }
+
+    @Test
+    void shouldPreserveStatusDuringInternalErrorDispatch() throws Exception {
+        mockMvc.perform(get("/error"))
+            .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(
+                get("/error")
+                    .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 500)
+                    .requestAttr(
+                        RequestDispatcher.ERROR_REQUEST_URI,
+                        "/api/admin/post-reports"
+                    )
+                    .with(request -> {
+                        request.setDispatcherType(DispatcherType.ERROR);
+                        return request;
+                    })
+            )
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.status").value(500));
     }
 }
