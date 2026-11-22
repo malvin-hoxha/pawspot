@@ -165,6 +165,15 @@ export function Header() {
                   Οι αγγελίες μου
                 </Link>
 
+                {user?.role === 'ADMIN' && (
+                    <Link
+                        to="/admin/reports"
+                        className="text-sm font-medium text-forest hover:underline"
+                    >
+                        Αναφορές
+                    </Link>
+                )}
+
                 <Link
                   to="/posts/create"
                   className="
@@ -274,6 +283,15 @@ export function Header() {
                   <Link to="/posts/my" onClick={closeMenu}>
                     Οι αγγελίες μου
                   </Link>
+
+                  {user?.role === 'ADMIN' && (
+                      <Link
+                          to="/admin/reports"
+                          onClick={closeMenu}
+                      >
+                          Αναφορές
+                      </Link>
+                  )}
 
                   <Link to="/posts/create" onClick={closeMenu}>
                     Νέα αγγελία
