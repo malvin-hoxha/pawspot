@@ -36,7 +36,7 @@ public class UserResponse {
         return createdAt;
     }
 
-    public UserRole getUserRole() {
+    public UserRole getRole() {
         return role;
     }
 }

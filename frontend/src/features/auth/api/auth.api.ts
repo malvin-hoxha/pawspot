@@ -5,10 +5,11 @@ import { markAuthChanged } from '../../../api/authVersion'
 import { refreshSession, runLogout } from '../../../api/refresh'
 
 export interface AuthUser {
-    id: number
-    name: string
-    email: string
-    createdAt: string
+  id: number,
+  name: string,
+  email: string,
+  createdAt: string,
+  role: 'USER' | 'ADMIN'
 }
 
 export interface LoginInput {
@@ -71,3 +72,4 @@ export async function deleteAccount(password:string):Promise<void> {
     });
   });
 }
+
