@@ -46,7 +46,7 @@ public class AuthController {
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         User user = authService.register(request);
 
-        UserResponse response = new UserResponse(user.getId(), user.getName(),user.getEmail(), user.getCreatedAt());
+        UserResponse response = new UserResponse(user.getId(), user.getName(),user.getEmail(), user.getCreatedAt(), user.getRole());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -77,7 +77,7 @@ public class AuthController {
     public ResponseEntity<UserResponse> me(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
 
-        UserResponse response = new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+        UserResponse response = new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt(), user.getRole());
 
         return ResponseEntity.ok(response);
     }

@@ -10,6 +10,7 @@ import { getCurrentUser, logout } from '../../src/features/auth/api/auth.api'
 import { AxiosError } from 'axios'
 import type { InternalAxiosRequestConfig } from 'axios'
 import { useAuth } from '../../src/features/auth/hooks/useAuth'
+import type { AuthUser } from '../../src/features/auth/api/auth.api'
 
 vi.mock('../../src/features/auth/api/auth.api', () => ({
   getCurrentUser: vi.fn(),
@@ -19,23 +20,13 @@ vi.mock('../../src/features/auth/api/auth.api', () => ({
 describe('Logout authentication race', () => {
   it('does not restore a user from a request started during logout', async () => {
     let completeLogout!: () => void
-    let completeMe!: (user: {
-      id: number
-      name: string
-      email: string
-      createdAt: string
-    }) => void
+    let completeMe!: (user: AuthUser) => void
 
     const logoutGate = new Promise<void>(resolve => {
       completeLogout = resolve
     })
 
-    const meGate = new Promise<{
-      id: number
-      name: string
-      email: string
-      createdAt: string
-    }>(resolve => {
+    const meGate = new Promise<AuthUser>(resolve => {
       completeMe = resolve
     })
 
@@ -92,6 +83,7 @@ describe('Logout authentication race', () => {
         name: 'Noe',
         email: 'noe@example.com',
         createdAt: '2026-10-20T00:00:00Z',
+        role: 'USER'
       })
       await meGate
     })

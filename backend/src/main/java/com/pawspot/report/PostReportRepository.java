@@ -1,7 +1,18 @@
 package com.pawspot.report;
 
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface PostReportRepository extends JpaRepository<PostReport, Long>{
+import com.pawspot.report.enums.ReportStatus;
 
+public interface PostReportRepository extends JpaRepository<PostReport, Long>{
+    Page<PostReport> findByStatus(ReportStatus status, Pageable pageable);
+
+    List<PostReport> findByReportedPostIdAndStatus(
+        Long reportedPostId,
+        ReportStatus status
+    );
 }

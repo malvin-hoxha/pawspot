@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useLogin } from '../../src/features/auth/hooks/useLogin'
 import { useLogout } from '../../src/features/auth/hooks/useLogout'
 import { login, logout } from '../../src/features/auth/api/auth.api'
+import type { AuthUser } from '../../src/features/auth/api/auth.api'
 
 vi.mock('../../src/features/auth/api/auth.api', () => ({
   login: vi.fn(),
@@ -21,18 +22,20 @@ describe('Authentication cache lifecycle', () => {
       },
     })
 
-    const userA = {
+    const userA: AuthUser = {
       id: 1,
       name: 'User A',
       email: 'a@example.com',
       createdAt: '2026-10-20T00:00:00Z',
+      role: 'USER',
     }
 
-    const userB = {
+    const userB: AuthUser = {
       id: 2,
       name: 'User B',
       email: 'b@example.com',
       createdAt: '2026-10-20T00:00:00Z',
+      role: 'USER',
     }
 
     vi.mocked(login)

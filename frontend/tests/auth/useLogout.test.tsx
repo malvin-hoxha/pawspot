@@ -48,11 +48,12 @@ describe('useLogout', () => {
       return query
     }
 
-    const user = {
+    const user:AuthUser = {
       id: 1,
       name: 'Noe',
       email: 'noe@example.com',
       createdAt: '2026-10-20T00:00:00Z',
+      role: 'USER'
     }
 
     const authQuery = renderHook(() => useTestAuthQuery(), { wrapper })

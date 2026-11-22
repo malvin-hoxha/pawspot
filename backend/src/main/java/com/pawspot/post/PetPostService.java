@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.pawspot.exception.ForbiddenOperationException;
@@ -24,6 +25,9 @@ import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.post.specification.PetPostSpecification;
 import com.pawspot.user.User;
+import com.pawspot.user.enums.UserRole;
+
+import org.springframework.transaction.support.TransactionSynchronization;
 
 @Service 
 public class PetPostService {
@@ -132,6 +136,7 @@ public class PetPostService {
         return petPostRepository.save(post);
     }
 
+    @Transactional 
     public void deletePost(Long id, User user) {
         PetPost post = petPostRepository.findById(id)
             .orElseThrow(() -> 
@@ -144,17 +149,40 @@ public class PetPostService {
             );
         }
 
-        String imagePublicId = post.getImagePublicId();
-        petPostRepository.delete(post);
+        deletePostAndScheduleImageCleanup(post);
+    }
 
-        try {
-            cloudinaryService.delete(post.getImagePublicId());
-        } catch (RuntimeException ex) {
-            log.error(
-                "Failed to delete Cloudinary image: {}",
-                imagePublicId,
-                ex
+    @Transactional
+    public void deletePostAsAdmin(Long id, User admin) {
+        if(admin.getRole() != UserRole.ADMIN) {
+            throw new ForbiddenOperationException(
+                "Only admins can remove reported posts"
             );
         }
+
+        PetPost post = getPost(id);
+        deletePostAndScheduleImageCleanup(post);
+    }
+
+    private void deletePostAndScheduleImageCleanup(PetPost post) {
+        String imagePublicId = post.getImagePublicId();
+
+        petPostRepository.delete(post);
+
+        // Delete the external image only after the database transaction commits.
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override 
+                public void afterCommit() {
+                    try {
+                        cloudinaryService.delete(imagePublicId);
+                    } catch (RuntimeException ex) {
+                        log.error("Failed to delete Cloudinary image: {}",
+                            imagePublicId, ex
+                        );
+                    }
+                }
+            }
+        );
     }
 }

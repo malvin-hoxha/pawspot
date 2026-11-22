@@ -81,7 +81,8 @@ public class AuthService {
             user.getId(),
             user.getName(),
             user.getEmail(),
-            user.getCreatedAt()
+            user.getCreatedAt(),
+            user.getRole()
         );
 
         return new LoginResult(accessToken, generatedRefreshToken.token(), userResponse);

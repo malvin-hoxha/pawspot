@@ -18,6 +18,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 //Authenticates users on protected requests
 @Component
@@ -60,15 +61,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
 
         if (token != null) {
 
+
+
             try {
                 Claims claims = jwtService.validateAccessToken(token);       //Verification sign
 
                 if(SecurityContextHolder.getContext().getAuthentication() == null) {
                     User user = userRepository.findByEmail(claims.getSubject()).orElse(null);
                     if (user != null) {
-                        UsernamePasswordAuthenticationToken authentication = 
-                            new UsernamePasswordAuthenticationToken(user, null, List.of()); //List.of() means the roles of the user
-                            SecurityContextHolder.getContext().setAuthentication(authentication);
+                        var authority = new SimpleGrantedAuthority("ROLE_" + user.getRole().name());
+                        var authentication = new UsernamePasswordAuthenticationToken(user,null, List.of(authority));                      
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
                 } 
             } catch (JwtException e) {

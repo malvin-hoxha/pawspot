@@ -16,6 +16,9 @@ import { AccountPage } from './pages/AccountPage';
 import { ConversationPage } from './pages/ConversationPage';
 import { MessagesPage } from './pages/MessagesPage';
 
+import { AdminRoute } from './features/auth/components/AdminRoute'
+import { AdminReportsPage } from './pages/AdminReportsPage'
+
 
 function App() {
 
@@ -43,6 +46,10 @@ function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/messages/:id" element={<ConversationPage />} />
             <Route path="/messages" element={<MessagesPage />} />
+          </Route>
+
+          <Route element={<AdminRoute />}>
+            <Route path="/admin/reports" element={<AdminReportsPage />} />
           </Route>
         </Routes>
       </main>

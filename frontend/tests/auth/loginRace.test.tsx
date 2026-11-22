@@ -27,6 +27,7 @@ describe('Login identity race', () => {
       name: 'User A',
       email: 'a@example.com',
       createdAt: '2026-10-21T00:00:00Z',
+      role: 'USER'
     }
 
     const userB: AuthUser = {
@@ -34,6 +35,7 @@ describe('Login identity race', () => {
       name: 'User B',
       email: 'b@example.com',
       createdAt: '2026-10-21T00:00:00Z',
+      role: 'USER'
     }
 
     let completeOldRequest!: (user: AuthUser) => void
