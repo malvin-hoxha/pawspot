@@ -2,7 +2,7 @@
 
 PawSpot is a full-stack lost-and-found pet platform. Visitors can browse public listings, open listing details, and search by category, location, species, or keyword. Signed-in users can publish and manage photo listings, contact another listing's owner through private conversations, submit reports on listings for future review, and manage their account. The interface is primarily in Greek.
 
-**Main technologies:** Java 17, Spring Boot, Spring Security, PostgreSQL, React, TypeScript, Vite, Tailwind CSS, TanStack Query, and Cloudinary.
+**Main technologies:** Java 17, Spring Boot, Spring Security, PostgreSQL, Flyway, React, TypeScript, Vite, Tailwind CSS, TanStack Query, and Cloudinary.
 
 ![PawSpot home page](docs/screenshots/00-landing-page.png)
 
@@ -38,7 +38,7 @@ PawSpot is a full-stack lost-and-found pet platform. Visitors can browse public 
 | Area | Technologies |
 | --- | --- |
 | Backend | Java 17, Spring Boot, Spring Security, Spring Data JPA, Jakarta Validation |
-| Database | PostgreSQL 17, PostgreSQL `unaccent` extension |
+| Database | PostgreSQL 17, Flyway, PostgreSQL `unaccent` extension |
 | Frontend | React, TypeScript, Vite, Tailwind CSS, React Router |
 | API and server state | Axios, TanStack Query |
 | Mapping and image storage | MapStruct, Cloudinary |
@@ -103,17 +103,11 @@ docker compose up -d postgres
 docker compose exec postgres pg_isready
 ```
 
-Once PostgreSQL is ready, enable the extension used for city searches:
-
-```bash
-docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS unaccent;"'
-```
-
-Docker Compose runs PostgreSQL only. The backend and frontend run separately. Database data is retained in a named Docker volume.
+Docker Compose runs PostgreSQL only. The backend and frontend run separately. Database data is retained in a named Docker volume. Flyway initializes a new database when the backend starts, including the `unaccent` extension.
 
 ### 3. Start the backend
 
-In a terminal at the repository root:
+In a Bash terminal at the repository root:
 
 ```bash
 set -a
@@ -123,7 +117,29 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-Exporting the variables is necessary: Spring Boot does not automatically load the root `.env` file. The backend listens at `http://localhost:8080` and creates or updates its local schema through Hibernate.
+Spring Boot does not automatically load the root `.env` file. Load and export its variables in every new terminal session before starting the backend. Never commit credentials or secrets from `.env`. The backend listens at `http://localhost:8080`.
+
+Flyway manages schema changes through versioned SQL files in `backend/src/main/resources/db/migration/`. On startup, Flyway applies pending migrations before Hibernate validates the entity mappings. The application uses `spring.jpa.hibernate.ddl-auto=validate`, so Hibernate does not create or update the schema. The initial migration, `V1__initial_schema.sql`, initializes a new database, including the `unaccent` extension.
+
+#### Adopt Flyway on an existing database
+
+Before adopting Flyway, confirm that the existing PawSpot schema matches V1 and take a database backup. Then perform a one-time baseline at version 1. In a Bash terminal at the repository root, load the environment variables and start the backend with the baseline option:
+
+```bash
+set -a
+source .env
+set +a
+cd backend
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=1"
+```
+
+This records a `BASELINE` entry at version 1 in `flyway_schema_history` without running V1 against the existing schema. Use `baseline-on-migrate` only for this one-time adoption. For subsequent starts, load `.env` in the new terminal session as shown above and use the ordinary command:
+
+```bash
+./mvnw spring-boot:run
+```
+
+For future schema changes, add a new migration such as `V2__description.sql` and commit it with the related application changes. Do not modify an already-applied migration.
 
 ### 4. Start the frontend
 
@@ -153,7 +169,7 @@ From `backend/`:
 ./mvnw test
 ```
 
-Integration tests use a separate PostgreSQL 17 Testcontainer and test-only configuration. Docker must be running. Coverage includes post authorization and validation, refresh-token rotation and reuse, account deletion, messaging and duplicate-conversation prevention, report submission, and concurrent database operations.
+Integration tests use a separate PostgreSQL 17 Testcontainer and test-only configuration. Flyway initializes the temporary database schema, then Hibernate validates the entity mappings before the tests run. Docker must be running. Coverage includes post authorization and validation, refresh-token rotation and reuse, account deletion, messaging and duplicate-conversation prevention, report submission, and concurrent database operations.
 
 ### Frontend unit and integration tests
 
@@ -217,6 +233,7 @@ Listing query parameters: `type`, `status`, `species`, `city`, `search`, `page`,
 | `backend/src/main/java/com/pawspot/message/` | Private conversations, messages, and participant checks |
 | `backend/src/main/java/com/pawspot/report/` | Report submission and pending report records |
 | `backend/src/main/java/com/pawspot/user/` | Account data and deletion flow |
+| `backend/src/main/resources/db/migration/` | Versioned Flyway database migrations |
 | `backend/src/test/` | Unit and PostgreSQL integration tests |
 | `frontend/src/api/` | HTTP client plus auth, listing, messaging, and reporting requests |
 | `frontend/src/features/auth/` | Authentication functions, hooks, and route protection |
