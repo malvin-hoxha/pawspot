@@ -44,10 +44,6 @@ public abstract class PostgresIntegrationTest {
             databaseName,
             "Refusing to truncate a non-test database"
         );
-
-        integrationTestJdbcTemplate.execute(
-            "CREATE EXTENSION IF NOT EXISTS unaccent"
-        );
         
         integrationTestJdbcTemplate.execute("""
             TRUNCATE TABLE
