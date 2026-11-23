@@ -57,6 +57,8 @@ export function ConversationPage() {
       lastPage.last ? undefined : lastPage.page + 1,
     enabled: isValidId && !!user && conversation.isSuccess,
     retry: false,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   })
 
   const history = Array.from(
