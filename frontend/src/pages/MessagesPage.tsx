@@ -12,6 +12,8 @@ export function MessagesPage() {
     queryKey: ['conversations', user?.id, 'inbox', page],
     queryFn: () => getConversations(page),
     enabled: !!user,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   })
 
   if (conversations.isPending) return <p>Φόρτωση συζητήσεων…</p>
