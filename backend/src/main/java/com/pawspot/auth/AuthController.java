@@ -25,21 +25,27 @@ import com.pawspot.user.User;
 
 import jakarta.validation.Valid;
 
+import com.pawspot.auth.ratelimit.LoginRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
     private final AuthCookieFactory authCookieFactory;
+    private final LoginRateLimiter loginRateLimiter;
 
     public AuthController(
         AuthService authService,
         RefreshTokenService refreshTokenService,
-        AuthCookieFactory authCookieFactory
+        AuthCookieFactory authCookieFactory,
+        LoginRateLimiter loginRateLimiter
     ) {
         this.authService = authService;
         this.refreshTokenService = refreshTokenService;
         this.authCookieFactory = authCookieFactory;
+        this.loginRateLimiter = loginRateLimiter;
     }
 
     @PostMapping("/register")
@@ -52,9 +58,19 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(
+        @Valid @RequestBody LoginRequest request,
+        HttpServletRequest httpRequest
+    ) {
+        // Reject excessive attempts before checking credentials.
+        loginRateLimiter.checkIp(httpRequest.getRemoteAddr());
+        loginRateLimiter.checkEmail(request.getEmail());
 
         LoginResult result = authService.login(request);
+        
+        // Failed logins throw an exception and never reach this line.
+        loginRateLimiter.onLoginSuccess(request.getEmail());
+
         ResponseCookie accessCookie = authCookieFactory.createAccessCookie(result.accessToken());
 
         ResponseCookie refreshCookie = authCookieFactory.createRefreshCookie(result.refreshToken());

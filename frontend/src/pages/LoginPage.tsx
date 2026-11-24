@@ -16,8 +16,30 @@ export function LoginPage() {
     ? `${from.pathname}${from.search}${from.hash}`
     : '/';
 
-  const invalidCredentials = axios.isAxiosError(login.error) &&
-    login.error.response?.status === 401;
+  const errorResponse = axios.isAxiosError(login.error)
+    ? login.error.response
+    : undefined;
+
+  const retryAfterSeconds = Number(
+    errorResponse?.headers['retry-after']
+  );
+
+  let errorMessage = 'Δεν ήταν δυνατή η σύνδεση. Προσπάθησε ξανά.';
+
+  if (errorResponse?.status === 401) {
+    errorMessage = 'Λάθος email ή κωδικός. Δοκίμασε ξανά.';
+  } else if (errorResponse?.status === 429) {
+    errorMessage = 'Πολλές προσπάθειες σύνδεσης. Δοκίμασε αργότερα.';
+
+    if (
+      Number.isSafeInteger(retryAfterSeconds) &&
+      retryAfterSeconds > 0
+    ) {
+      errorMessage =
+        `Πολλές προσπάθειες σύνδεσης. Περίμενε ${retryAfterSeconds} ` +
+        'δευτερόλεπτα πριν δοκιμάσεις ξανά.';
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,9 +89,7 @@ export function LoginPage() {
 
         {login.isError && (
           <p role="alert" className="text-sm text-red-700">
-            {invalidCredentials
-              ? 'Λάθος email ή κωδικός. Δοκίμασε ξανά.'
-              : 'Δεν ήταν δυνατή η σύνδεση. Προσπάθησε ξανά.'}
+            {errorMessage}
           </p>
         )}
 

@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -304,5 +305,161 @@ class AuthControllerIntegrationTest extends PostgresIntegrationTest {
             )
             .setParameter("userId", userId)
             .getSingleResult();
+    }
+
+    @Test
+    void shouldLimitAttemptsForTheSameEmailAcrossDifferentIps()
+            throws Exception {
+
+        String requestBody = """
+            {
+                "email": "rate-limit-unknown@pawspot.com",
+                "password": "WrongPassword123!"
+            }
+            """;
+
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            String ip = "192.0.2." + attempt;
+
+            mockMvc.perform(
+                post("/api/auth/login")
+                    .with(csrf())
+                    .with(request -> {
+                        request.setRemoteAddr(ip);
+                        return request;
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody)
+            )
+            .andExpect(status().isUnauthorized());
+        }
+
+        // Changing the IP must not bypass the email limit.
+        MvcResult result = mockMvc.perform(
+            post("/api/auth/login")
+                .with(csrf())
+                .with(request -> {
+                    request.setRemoteAddr("192.0.2.6");
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+        .andReturn();
+
+        long retryAfter = Long.parseLong(
+            result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)
+        );
+
+        assertTrue(retryAfter > 0 && retryAfter <= 600);
+    }
+
+    @Test
+    void shouldLimitAttemptsFromTheSameIpAcrossDifferentEmails()
+            throws Exception {
+
+        String ip = "192.0.2.100";
+
+        String requestBody = """
+            {
+                "email": "ip-limit-%d@pawspot.com",
+                "password": "WrongPassword123!"
+            }
+            """;
+
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            mockMvc.perform(
+                post("/api/auth/login")
+                    .with(csrf())
+                    .with(request -> {
+                        request.setRemoteAddr(ip);
+                        return request;
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody.formatted(attempt))
+            )
+            .andExpect(status().isUnauthorized());
+        }
+
+        // A new email must not bypass the exhausted IP limit.
+        MvcResult result = mockMvc.perform(
+            post("/api/auth/login")
+                .with(csrf())
+                .with(request -> {
+                    request.setRemoteAddr(ip);
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody.formatted(21))
+        )
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+        .andReturn();
+
+        long retryAfter = Long.parseLong(
+            result.getResponse().getHeader(HttpHeaders.RETRY_AFTER)
+        );
+
+        assertTrue(retryAfter > 0 && retryAfter <= 60);
+
+        // Another IP still has its own attempt budget.
+        mockMvc.perform(
+            post("/api/auth/login")
+                .with(csrf())
+                .with(request -> {
+                    request.setRemoteAddr("192.0.2.101");
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody.formatted(22))
+        )
+        .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldResetEmailAttemptsAfterSuccessfulLogin() throws Exception {
+        String email = "reset-limit@pawspot.com";
+        String password = "Password123!";
+        String ip = "192.0.2.110";
+
+        registerUser("Reset Limit Test", email, password);
+
+        String requestBody = """
+            {
+                "email": "reset-limit@pawspot.com",
+                "password": "%s"
+            }
+            """;
+
+        // Each successful fifth attempt must reset the email counter.
+        for (int cycle = 0; cycle < 2; cycle++) {
+            for (int attempt = 0; attempt < 4; attempt++) {
+                mockMvc.perform(
+                    post("/api/auth/login")
+                        .with(csrf())
+                        .with(request -> {
+                            request.setRemoteAddr(ip);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody.formatted("WrongPassword123!"))
+                )
+                .andExpect(status().isUnauthorized());
+            }
+
+            mockMvc.perform(
+                post("/api/auth/login")
+                    .with(csrf())
+                    .with(request -> {
+                        request.setRemoteAddr(ip);
+                        return request;
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(requestBody.formatted(password))
+            )
+            .andExpect(status().isOk());
+        }
     }
 }
