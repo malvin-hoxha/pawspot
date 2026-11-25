@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -27,6 +26,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.pawspot.image.CloudinaryService;
+import com.pawspot.image.cleanup.ImageDeletionTaskRepository;
 import com.pawspot.post.PetPost;
 import com.pawspot.post.PetPostRepository;
 import com.pawspot.post.enums.PetSpecies;
@@ -63,6 +63,9 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private PostReportRepository reports;
+
+    @Autowired
+    private ImageDeletionTaskRepository imageDeletionTasks;
 
     private User reporter;
     private Long postId;
@@ -330,7 +333,15 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
             assertEquals(resolvedAt, updated.getResolvedAt());
         }
 
-        verify(cloudinaryService).delete("pawspot/posts/reported-post");
+        var queuedTasks = imageDeletionTasks.findAll();
+
+        assertEquals(1, queuedTasks.size());
+        assertEquals(
+            "pawspot/posts/reported-post",
+            queuedTasks.get(0).getPublicId()
+        );
+
+        verifyNoInteractions(cloudinaryService);
     }
 
     @Test
@@ -358,19 +369,24 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
         PostReport unchanged = reports.findById(report.getId()).orElseThrow();
         assertEquals(ReportStatus.PENDING, unchanged.getStatus());
+        assertEquals(0L, imageDeletionTasks.count());
 
         verifyNoInteractions(cloudinaryService);
     }
 
     @Test
-    void shouldRollbackPostRemovalWithoutDeletingImage() {
+    void shouldRollbackPostRemovalAndQueuedTaskTogether() {
         User admin = createUser("Admin", "admin@test.com");
         admin.setRole(UserRole.ADMIN);
         users.saveAndFlush(admin);
 
+        PetPost post = posts.findById(postId).orElseThrow();
+        post.setImagePublicId("pawspot/posts/rollback-reported-post");
+        posts.saveAndFlush(post);
+
         PostReport report = reports.saveAndFlush(
             new PostReport(
-                posts.findById(postId).orElseThrow(),
+                post,
                 reporter,
                 ReportReason.SPAM,
                 "Repeated listing"
@@ -384,13 +400,19 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
             // Execute the database changes before deliberately rolling them back.
             reports.flush();
+
+            assertFalse(posts.existsById(postId));
+            assertEquals(1L, imageDeletionTasks.count());
+
             status.setRollbackOnly();
         });
 
         assertTrue(posts.existsById(postId));
+        assertEquals(0L, imageDeletionTasks.count());
 
         PostReport restored = reports.findById(report.getId()).orElseThrow();
         assertEquals(ReportStatus.PENDING, restored.getStatus());
+        assertNull(restored.getResolvedAt());
 
         verifyNoInteractions(cloudinaryService);
     }

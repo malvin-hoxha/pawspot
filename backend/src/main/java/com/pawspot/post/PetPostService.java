@@ -1,7 +1,5 @@
 package com.pawspot.post;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -9,7 +7,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.pawspot.exception.ForbiddenOperationException;
@@ -26,24 +23,27 @@ import com.pawspot.post.request.UpdatePetPostRequest;
 import com.pawspot.post.specification.PetPostSpecification;
 import com.pawspot.user.User;
 import com.pawspot.user.enums.UserRole;
-
-import org.springframework.transaction.support.TransactionSynchronization;
+import com.pawspot.image.cleanup.ImageDeletionQueueService;
 
 @Service 
 public class PetPostService {
     private final PetPostRepository petPostRepository;
     private final CloudinaryService cloudinaryService;
     private final PetPostMapper petPostMapper;
-    private static final Logger log = LoggerFactory.getLogger(PetPostService.class);
+    private final ImageDeletionQueueService imageDeletionQueueService;
 
 
 
-    public PetPostService(PetPostRepository petPostRepository, CloudinaryService cloudinaryService,
-        PetPostMapper petPostMapper
+    public PetPostService(
+        PetPostRepository petPostRepository, 
+        CloudinaryService cloudinaryService,
+        PetPostMapper petPostMapper, 
+        ImageDeletionQueueService imageDeletionQueueService
     ) {
         this.petPostRepository = petPostRepository;
         this.cloudinaryService = cloudinaryService;
         this.petPostMapper = petPostMapper;
+        this.imageDeletionQueueService = imageDeletionQueueService;
     }
 
     public PetPost createPost(CreatePetPostRequest request, MultipartFile image, User user) {
@@ -149,7 +149,7 @@ public class PetPostService {
             );
         }
 
-        deletePostAndScheduleImageCleanup(post);
+        deletePostAndQueueImageCleanup(post);
     }
 
     @Transactional
@@ -161,28 +161,12 @@ public class PetPostService {
         }
 
         PetPost post = getPost(id);
-        deletePostAndScheduleImageCleanup(post);
+        deletePostAndQueueImageCleanup(post);
     }
 
-    private void deletePostAndScheduleImageCleanup(PetPost post) {
-        String imagePublicId = post.getImagePublicId();
-
+    private void deletePostAndQueueImageCleanup(PetPost post) {
+        // Persist the cleanup task and delete the post in the same transaction.
+        imageDeletionQueueService.enqueue(post.getImagePublicId());
         petPostRepository.delete(post);
-
-        // Delete the external image only after the database transaction commits.
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override 
-                public void afterCommit() {
-                    try {
-                        cloudinaryService.delete(imagePublicId);
-                    } catch (RuntimeException ex) {
-                        log.error("Failed to delete Cloudinary image: {}",
-                            imagePublicId, ex
-                        );
-                    }
-                }
-            }
-        );
     }
 }

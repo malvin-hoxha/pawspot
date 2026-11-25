@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.pawspot.auth.refreshtoken.repository.RefreshSessionRepository;
 import com.pawspot.auth.refreshtoken.repository.RefreshTokenRepository;
+import com.pawspot.image.cleanup.ImageDeletionQueueService;
 import com.pawspot.post.PetPost;
 import com.pawspot.post.PetPostRepository;
 
@@ -16,38 +17,38 @@ public class UserDeletionTransactionService {
     private final PetPostRepository petPostRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshSessionRepository refreshSessionRepository;
+    private final ImageDeletionQueueService imageDeletionQueueService;
 
     public UserDeletionTransactionService(
         UserRepository userRepository,
         PetPostRepository petPostRepository,
         RefreshTokenRepository refreshTokenRepository,
-        RefreshSessionRepository refreshSessionRepository
+        RefreshSessionRepository refreshSessionRepository,
+        ImageDeletionQueueService imageDeletionQueueService
     ) {
         this.userRepository = userRepository;
         this.petPostRepository = petPostRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.refreshSessionRepository = refreshSessionRepository;
+        this.imageDeletionQueueService = imageDeletionQueueService;
     }
 
     @Transactional 
-    public List<String> deleteUserData(Long userId) {
+    public void deleteUserData(Long userId) {
         User user = userRepository.findByIdForUpdate(userId)
             .orElseThrow();
 
         List<PetPost> posts = petPostRepository.findByUserId(userId);
 
-        List<String> imagePublicIds = posts.stream()
-            .map(PetPost::getImagePublicId)
-            .filter(id -> id != null && !id.isBlank())
-            .toList();
+        for (PetPost post : posts) {
+            imageDeletionQueueService.enqueue(post.getImagePublicId());
+        }
 
         refreshTokenRepository.deleteAllByUserId(userId);
         refreshSessionRepository.deleteAllByUserId(userId);
 
         petPostRepository.deleteAll(posts);
         userRepository.delete(user); 
-
-        return imagePublicIds;
     }
 
     
