@@ -1,5 +1,6 @@
 package com.pawspot.report;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -80,10 +81,19 @@ public class PostReportService {
 
     @Transactional 
     public void dismissReport(Long reportId) {
-        PostReport postReport = postReportRepository.findById(reportId)
+        PostReport report = postReportRepository.findById(reportId)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND,"Report not found"));
-        postReport.setStatus(ReportStatus.DISMISSED);
+
+        // Prevent repeated requests from changing the resolution time.
+        if (report.getStatus() != ReportStatus.PENDING) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Report has already been resolved"
+            );
+        }
+        report.setStatus(ReportStatus.DISMISSED);
+        report.setResolvedAt(Instant.now());
     }
 
     @Transactional 
@@ -93,6 +103,13 @@ public class PostReportService {
                 HttpStatus.NOT_FOUND,
                 "Report not found"
             ));
+
+        if (report.getStatus() != ReportStatus.PENDING) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Report has already been resolved"
+            );
+        }
         
         PetPost post = report.getPost();
 
@@ -106,10 +123,19 @@ public class PostReportService {
         List<PostReport> reports = postReportRepository.
             findByReportedPostIdAndStatus(report.getReportedPostId(), ReportStatus.PENDING);
          
+        Instant resolvedAt = Instant.now();
+
+        // All pending reports for this post are resolved by the same action.
         for (PostReport pendingReport : reports) {
             pendingReport.setStatus(ReportStatus.POST_REMOVED);
+            pendingReport.setResolvedAt(resolvedAt);
         }
 
         petPostService.deletePostAsAdmin(post.getId(), admin);
+    }
+
+    @Transactional
+    public int cleanupResolvedReports(Instant cutoff) {
+        return postReportRepository.deleteResolvedBefore(cutoff);
     }
 }

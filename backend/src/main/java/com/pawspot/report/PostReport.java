@@ -65,6 +65,10 @@ public class PostReport {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    // Null while the report is pending.
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
     public PostReport(
         PetPost post,
         User reporter,
