@@ -25,6 +25,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import com.pawspot.image.cleanup.ImageDeletionQueueService;
 
 class PetPostServiceTest {
 
@@ -39,6 +40,9 @@ class PetPostServiceTest {
 
     @InjectMocks
     private PetPostService petPostService;
+
+    @Mock
+    private ImageDeletionQueueService imageDeletionQueueService;
 
     @BeforeEach
     void setUp() {

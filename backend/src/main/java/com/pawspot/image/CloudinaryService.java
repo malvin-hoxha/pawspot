@@ -69,15 +69,28 @@ public class CloudinaryService {
     }
 
     public void delete(String publicId) {
+        Map<?, ?> response; //Wild cards
         try {
-            cloudinary.uploader().destroy(
+            response = cloudinary.uploader().destroy(
                 publicId,
                 ObjectUtils.asMap(
-                    "resource_type", "image"
-                ));
-        } catch (Exception e) {
+                    "resource_type", "image",
+                    "type", "upload",
+                    "invalidate", true
+                )
+            );
+        } catch (Exception ex) {
             throw new ImageUploadException(
-                "Failed to delete image"
+                "Failed to delete image",
+                ex
+            );
+        }
+
+        Object result = response == null ? null : response.get("result");
+        // An already missing image also satisfies the deletion request.
+        if (!"ok".equals(result) && !"not found".equals(result)) {
+            throw new ImageUploadException(
+                "Cloudinary did not confirm image deletion"
             );
         }
     }

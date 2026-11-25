@@ -4,7 +4,6 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 
 import com.pawspot.exception.ForbiddenOperationException;
-import com.pawspot.exception.image.ImageUploadException;
 import com.pawspot.image.CloudinaryService;
 import com.pawspot.image.ImageUploadResult;
 import com.pawspot.post.enums.PetSpecies;
@@ -23,13 +22,11 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,6 +42,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import com.pawspot.image.cleanup.ImageDeletionTaskRepository;
 
 @SpringBootTest
 public class PetPostIntegrationTest extends PostgresIntegrationTest {
@@ -69,6 +67,9 @@ public class PetPostIntegrationTest extends PostgresIntegrationTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private ImageDeletionTaskRepository imageDeletionTasks;
 
     @Test
     void shouldCreatePost() {
@@ -238,7 +239,16 @@ public class PetPostIntegrationTest extends PostgresIntegrationTest {
         assertFalse(petPostRepository.existsById(postId));
 
         // Assert: Ζητήθηκε διαγραφή της εικόνας
-        verify(cloudinaryService).delete("pawspot/posts/dog123");
+        // Deletion is queued for the background worker.
+        var queuedTasks = imageDeletionTasks.findAll();
+
+        assertEquals(1, queuedTasks.size());
+        assertEquals(
+            "pawspot/posts/dog123",
+            queuedTasks.get(0).getPublicId()
+        );
+
+        verify(cloudinaryService, never()).delete(anyString());
     }
 
     @Test
@@ -281,6 +291,7 @@ public class PetPostIntegrationTest extends PostgresIntegrationTest {
 
         // Assert: Δεν ζητήθηκε διαγραφή εικόνας
         verify(cloudinaryService, never()).delete(anyString());
+        assertEquals(0L, imageDeletionTasks.count());
     }
 
     @Test
@@ -407,44 +418,40 @@ public class PetPostIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void shouldDeletePostEvenWhenCloudinaryFails() {
-        // Arrange: Δημιουργία χρήστη
+    void shouldRollBackPostDeletionAndQueuedTaskTogether() {
         User user = new User();
-        user.setName("Cloudinary Failure User");
-        user.setEmail("cloudinary-failure@test.com");
+        user.setName("Rollback User");
+        user.setEmail("post-rollback@test.com");
         user.setPassword("test-password");
 
         User savedUser = userRepository.save(user);
 
-        // Δημιουργία αγγελίας
         PetPost post = new PetPost();
         post.setTitle("Lost dog");
         post.setDescription("Small brown dog");
         post.setCity("Thessaloniki");
         post.setType(PostType.LOST);
         post.setSpecies(PetSpecies.DOG);
-        post.setImagePublicId("pawspot/posts/delete-failure");
+        post.setImagePublicId("pawspot/posts/rollback-image");
         post.setUser(savedUser);
 
         Long postId = petPostRepository.save(post).getId();
 
-        // Προσομοιώνουμε αποτυχία του Cloudinary
-        doThrow(new ImageUploadException("Cloudinary unavailable"))
-            .when(cloudinaryService)
-            .delete("pawspot/posts/delete-failure");
+        transactionTemplate.executeWithoutResult(status -> {
+            petPostService.deletePost(postId, savedUser);
 
-        // Act & Assert: Δεν πρέπει να πεταχτεί exception
-        assertDoesNotThrow(
-            () -> petPostService.deletePost(postId, savedUser)
-        );
+            assertFalse(petPostRepository.existsById(postId));
+            assertEquals(1L, imageDeletionTasks.count());
 
-        // Η αγγελία πρέπει να έχει διαγραφεί από τη βάση
-        assertFalse(petPostRepository.existsById(postId));
+            // Roll back after both database changes have happened.
+            status.setRollbackOnly();
+        });
 
-        // Το Cloudinary cleanup πρέπει να έχει επιχειρηθεί
-        verify(cloudinaryService).delete("pawspot/posts/delete-failure");
+        assertTrue(petPostRepository.existsById(postId));
+        assertEquals(0L, imageDeletionTasks.count());
+
+        verify(cloudinaryService, never()).delete(anyString());
     }
-
     
     @Test
     void shouldRejectStalePetPostUpdate() {

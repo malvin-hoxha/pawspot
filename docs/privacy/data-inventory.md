@@ -10,6 +10,7 @@ and records decisions required before public launch.
 | Accounts | Name, email, password hash, role, creation date | PostgreSQL | Account management and authentication |
 | Listings | Title, description, city, area, owner, timestamps | PostgreSQL | Publishing lost and found pet listings |
 | Images | Uploaded image | Cloudinary | Displaying listing photographs |
+| Image deletion tasks | Cloudinary public ID, failed-attempt count, creation timestamp, next-attempt timestamp | PostgreSQL | Reliable asynchronous image deletion |
 | Conversations | Participants, listing reference, timestamps | PostgreSQL | Private communication about listings |
 | Messages | Sender, message body, creation date | PostgreSQL | Private communication between participants |
 | Reports | Reporter, listing reference, reason, description, status, creation date | PostgreSQL | Reviewing reported content |
@@ -22,9 +23,28 @@ and records decisions required before public launch.
 - Account records, owned listings, refresh sessions and tokens are deleted.
 - Conversations involving the user and their messages are deleted through database cascades.
 - Authentication cookies are cleared.
-- Cloudinary image deletion is attempted after the database transaction commits.
+- Image deletion tasks are persisted in the same database transaction as account and listing deletion.
+- Cloudinary deletion is subsequently handled by the background worker.
 - Reports remain, with references to deleted users and listings set to null.
 - Report descriptions may still contain personal data.
+
+## Persistent image deletion
+
+- The mechanism covers listing removal by its owner or an admin, and account deletion.
+- Tasks have no foreign keys to deleted users or listings.
+- Task insertion rolls back if the enclosing deletion transaction rolls back.
+- Persisted tasks survive application restarts.
+- The job processes up to 20 due tasks per batch by default.
+- Processing within each batch is sequential in the current implementation.
+- The default initial delay is 60 seconds.
+- The default fixed delay after each completed batch is 60 seconds.
+- Each worker invocation uses a database transaction and a row lock.
+- Confirmed deletion or an already-missing image allows the task to be removed.
+- Failures increment the attempt count and defer processing by five minutes.
+- There is currently no maximum-attempt limit; defining one is deferred work.
+- Processing may repeat after external success followed by database rollback or a crash; execution is not exactly once.
+- Image cleanup is enabled by default, subject to the global scheduling switch and `app.images.cleanup.enabled`.
+- Cloudinary deletion requests include CDN invalidation, but this does not guarantee immediate removal from every cache or backup.
 
 ## Retention decisions and verification
 
@@ -37,7 +57,7 @@ and records decisions required before public launch.
 
 ## Known deletion gaps
 
-- Failed Cloudinary deletions are logged but are not queued for retry.
+- If post creation fails after an image upload, compensation still calls Cloudinary directly; a failed compensation deletion is not persisted for retry.
 - Clearing a report's user reference does not anonymize its free-text description.
 
 ## Before publication

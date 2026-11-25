@@ -47,6 +47,7 @@ public abstract class PostgresIntegrationTest {
         
         integrationTestJdbcTemplate.execute("""
             TRUNCATE TABLE
+                image_deletion_tasks,
                 refresh_tokens,
                 refresh_sessions,
                 pet_posts,
