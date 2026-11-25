@@ -38,6 +38,7 @@ import com.pawspot.user.User;
 import com.pawspot.user.UserRepository;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.pawspot.security.JwtService;
 import com.pawspot.user.enums.UserRole;
@@ -45,6 +46,7 @@ import com.pawspot.user.enums.UserRole;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.RequestDispatcher;
+import java.time.Instant;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -79,6 +81,23 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
     private Cookie accessCookie(User user) {
         return new Cookie("accessToken", jwtService.generateAccessToken(user));
+    }
+
+    private Long saveReportWithResolution(
+        ReportStatus status,
+        Instant resolvedAt
+    ) {
+        PostReport report = new PostReport(
+            posts.findById(postId).orElseThrow(),
+            reporter,
+            ReportReason.SPAM,
+            "Cleanup test"
+        );
+
+        report.setStatus(status);
+        report.setResolvedAt(resolvedAt);
+
+        return reports.saveAndFlush(report).getId();
     }
 
     @BeforeEach
@@ -118,6 +137,7 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
         assertEquals(reporter.getId(), saved.getReporter().getId());
         assertEquals(ReportReason.SPAM, saved.getReason());
         assertEquals(ReportStatus.PENDING, saved.getStatus());
+        assertNull(saved.getResolvedAt());
         assertEquals("Repeated listing", saved.getDescription());
     }
 
@@ -224,6 +244,22 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
         PostReport updated = reports.findById(report.getId()).orElseThrow();
 
         assertEquals(ReportStatus.DISMISSED, updated.getStatus());
+
+        var resolvedAt = updated.getResolvedAt();
+        assertNotNull(resolvedAt);
+
+        // Repeating the action must not extend the retention period.
+        mockMvc.perform(
+            post("/api/admin/post-reports/{reportId}/dismiss", report.getId())
+                .cookie(accessCookie(admin))
+                .with(csrf())
+        )
+        .andExpect(status().isConflict());
+
+        PostReport unchanged = reports.findById(report.getId()).orElseThrow();
+
+        assertEquals(ReportStatus.DISMISSED, unchanged.getStatus());
+        assertEquals(resolvedAt, unchanged.getResolvedAt());
     }
 
     @Test
@@ -279,12 +315,19 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
 
         assertFalse(posts.existsById(postId));
 
+        var resolvedAt = reports.findById(firstReport.getId())
+            .orElseThrow()
+            .getResolvedAt();
+
+        assertNotNull(resolvedAt);
+
         for (Long reportId : List.of(firstReport.getId(), secondReport.getId())) {
             PostReport updated = reports.findById(reportId).orElseThrow();
 
             assertEquals(ReportStatus.POST_REMOVED, updated.getStatus());
             assertEquals(postId, updated.getReportedPostId());
             assertNull(updated.getPost());
+            assertEquals(resolvedAt, updated.getResolvedAt());
         }
 
         verify(cloudinaryService).delete("pawspot/posts/reported-post");
@@ -371,5 +414,68 @@ class PostReportIntegrationTest extends PostgresIntegrationTest {
             )
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.status").value(500));
+    }
+
+    @Test
+    void shouldDeleteOnlyResolvedReportsAtOrBeforeTheCutoff() {
+        Instant cutoff = Instant.parse("2026-11-01T00:00:00Z");
+
+        Long oldDismissed = saveReportWithResolution(
+            ReportStatus.DISMISSED,
+            cutoff.minusSeconds(1)
+        );
+
+        Long oldRemoved = saveReportWithResolution(
+            ReportStatus.POST_REMOVED,
+            cutoff.minusSeconds(1)
+        );
+
+        Long exactlyAtCutoff = saveReportWithResolution(
+            ReportStatus.DISMISSED,
+            cutoff
+        );
+
+        Long recentDismissed = saveReportWithResolution(
+            ReportStatus.DISMISSED,
+            cutoff.plusSeconds(1)
+        );
+
+        Long recentRemoved = saveReportWithResolution(
+            ReportStatus.POST_REMOVED,
+            cutoff.plusSeconds(1)
+        );
+
+        Long pending = saveReportWithResolution(
+            ReportStatus.PENDING,
+            null
+        );
+
+        Long missingResolutionTime = saveReportWithResolution(
+            ReportStatus.DISMISSED,
+            null
+        );
+
+        int deleted = postReportService.cleanupResolvedReports(cutoff);
+
+        assertEquals(3, deleted);
+
+        for (Long id : List.of(oldDismissed, oldRemoved, exactlyAtCutoff)) {
+            assertFalse(reports.existsById(id));
+        }
+
+        for (Long id : List.of(
+            recentDismissed,
+            recentRemoved,
+            pending,
+            missingResolutionTime
+        )) {
+            assertTrue(reports.existsById(id));
+        }
+
+        // Deleting reports must preserve the listing itself.
+        assertTrue(posts.existsById(postId));
+
+        // Repeating cleanup with the same cutoff must not delete anything else.
+        assertEquals(0, postReportService.cleanupResolvedReports(cutoff));
     }
 }
