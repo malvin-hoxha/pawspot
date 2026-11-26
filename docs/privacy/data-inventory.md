@@ -53,11 +53,46 @@ and records decisions required before public launch.
 - The existing image deletion worker processes the task and retries failed deletion attempts.
 - If task insertion also fails, the original post-creation exception is preserved and the queueing exception is attached as suppressed.
 
+## Authentication retention
+
+- Refresh sessions currently expire seven days after creation.
+- Token rotation preserves the original expiration time.
+- Expired refresh token and session records are deleted by a scheduled
+  cleanup job, daily at 03:00 UTC.
+- Cleanup requires the application to be running with global scheduling
+  enabled.
+- Records are eligible for deletion when their expiration timestamp is
+  earlier than the cleanup execution time.
+- Revoked but unexpired records remain until expiration.
+- Account deletion removes the user's refresh tokens and sessions
+  within the account deletion transaction.
+- Expiration prevents authentication use; physical database deletion
+  happens during a later cleanup execution.
+- Application downtime or cleanup failures can delay physical deletion.
+
+## Application logging
+
+### Current implementation
+
+- The repository does not configure an application log file. Console output may still be captured by the runtime or hosting platform.
+- Hibernate SQL output is disabled by default and can be enabled explicitly for local debugging.
+- Cleanup logs record task IDs, attempt counts, deletion counts and, where applicable, exception class names.
+- The image deletion job does not directly log exception messages or stack traces.
+- Framework, database and future reverse-proxy logs require separate review. These changes do not guarantee that all logs exclude personal data.
+
+### Proposed production policy
+
+- Restrict operational log access to the operator.
+- Do not deliberately log passwords, tokens, cookies, private messages or report descriptions.
+- Define the production log retention period before public launch.
+- Configure and verify log rotation and deletion during deployment.
+- Review hosting-platform and reverse-proxy logging separately.
+- Production log retention is not currently enforced by the repository configuration.
+
 ## Retention decisions and verification
 
 - Finalize the proposed 30-day retention period for resolved reports before enabling automatic cleanup.
-- Verify cleanup of expired refresh sessions and token records.
-- Define production log contents, access and retention.
+- Verify the production logging policy and deployment configuration.
 - Define backup retention and handling of deletions after restoration.
 - Review Cloudinary storage, deletion and delivery-cache behavior.
 - Decide how to handle inactive accounts and old listings.
