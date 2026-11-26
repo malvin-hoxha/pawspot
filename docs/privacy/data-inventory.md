@@ -89,6 +89,15 @@ and records decisions required before public launch.
 - Review hosting-platform and reverse-proxy logging separately.
 - Production log retention is not currently enforced by the repository configuration.
 
+## Database backup and restore
+
+- PostgreSQL backup and isolated restore verification are currently manual.
+- The verified local procedure uses the existing `pawspot-postgres` container and stores custom-format archives on local disk outside the repository.
+- A manual isolated restore completed successfully on 2026-11-26. The historical verification details and commands are recorded in the [backup and restore runbook](../operations/backup-restore.md).
+- The local procedure is not automated or off-host, and it does not protect against loss of the machine or disk.
+- Database archives contain personal data and must not be committed to Git. Cloudinary image files are not included.
+- Production frequency, retention, encryption, access, off-host transfer and handling of deletions restored from older backups remain open decisions.
+
 ## Retention decisions and verification
 
 - Finalize the proposed 30-day retention period for resolved reports before enabling automatic cleanup.
