@@ -56,6 +56,25 @@ class ImageDeletionQueueIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void shouldCommitFailedCreationTaskIndependentlyOfOuterRollback() {
+        transactionTemplate.executeWithoutResult(status -> {
+            queue.enqueueAfterFailedCreation(
+                "pawspot/posts/failed-creation"
+            );
+
+            status.setRollbackOnly();
+        });
+
+        var saved = tasks.findAll();
+
+        assertEquals(1, saved.size());
+        assertEquals(
+            "pawspot/posts/failed-creation",
+            saved.get(0).getPublicId()
+        );
+    }
+
+    @Test
     void shouldRejectEnqueueWithoutAnExistingTransaction() {
         assertThrows(
             IllegalTransactionStateException.class,

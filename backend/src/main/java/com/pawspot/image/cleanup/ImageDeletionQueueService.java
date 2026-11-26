@@ -23,4 +23,14 @@ public class ImageDeletionQueueService {
         // Store the task in the caller's existing transaction.
         tasks.save(new ImageDeletionTask(publicId));
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void enqueueAfterFailedCreation(String publicId) {
+        if (publicId == null || publicId.isBlank()) {
+            return;
+        }
+
+        // Commit the cleanup task independently of the failed listing operation.
+        tasks.save(new ImageDeletionTask(publicId));
+    }
 }

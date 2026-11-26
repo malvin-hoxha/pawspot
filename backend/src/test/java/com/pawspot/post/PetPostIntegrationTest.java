@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -123,6 +124,50 @@ public class PetPostIntegrationTest extends PostgresIntegrationTest {
         assertEquals(PostStatus.ACTIVE, saved.getStatus());
 
         verify(cloudinaryService).upload(image);
+        assertEquals(0L, imageDeletionTasks.count());
+        verify(cloudinaryService, never()).delete(anyString());
+    }
+
+    @Test
+    void shouldCommitImageCleanupWhenDatabaseRejectsPostCreation() {
+        User user = new User();
+        user.setName("Failed Creation User");
+        user.setEmail("failed-creation@test.com");
+        user.setPassword("test-password");
+        User savedUser = userRepository.save(user);
+
+        CreatePetPostRequest request = new CreatePetPostRequest();
+        request.setTitle("x".repeat(256));
+        request.setDescription("Small brown dog");
+        request.setCity("Thessaloniki");
+        request.setType(PostType.LOST);
+        request.setSpecies(PetSpecies.DOG);
+
+        MultipartFile image = new MockMultipartFile(
+            "image",
+            "dog.jpg",
+            "image/jpeg",
+            "fake-image-content".getBytes(StandardCharsets.UTF_8)
+        );
+
+        when(cloudinaryService.upload(image)).thenReturn(
+            new ImageUploadResult(
+                "https://example.com/rejected.jpg",
+                "pawspot/posts/rejected"
+            )
+        );
+
+        // No outer transaction: this matches the controller's service call.
+        assertThrows(
+            DataIntegrityViolationException.class,
+            () -> petPostService.createPost(request, image, savedUser)
+        );
+
+        assertEquals(0L, petPostRepository.count());
+        var queuedTasks = imageDeletionTasks.findAll();
+        assertEquals(1, queuedTasks.size());
+        assertEquals("pawspot/posts/rejected", queuedTasks.get(0).getPublicId());
+        verify(cloudinaryService, never()).delete(anyString());
     }
 
     @Test
