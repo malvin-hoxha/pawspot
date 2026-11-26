@@ -3,6 +3,9 @@
 Internal working document. This describes the current implementation
 and records decisions required before public launch.
 
+Browser cookies, frontend storage, and browser-originated external requests are
+documented separately in [Browser storage and external requests](browser-storage.md).
+
 ## Data and purposes
 
 | Category | Data | Storage | Purpose |
