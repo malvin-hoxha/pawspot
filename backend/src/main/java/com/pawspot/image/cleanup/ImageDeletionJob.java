@@ -57,10 +57,11 @@ public class ImageDeletionJob {
                 worker.process(taskId);
             } catch (RuntimeException ex) {
                 // One failed transaction must not stop the remaining tasks.
+                // Record the task and failure type without logging exception details.
                 log.error(
-                    "Failed to process image deletion task {}",
+                    "Failed to process image deletion task {} (type={})",
                     taskId,
-                    ex
+                    ex.getClass().getSimpleName()
                 );
             }
         }
