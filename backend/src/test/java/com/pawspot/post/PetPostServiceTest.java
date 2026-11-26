@@ -1,11 +1,16 @@
 package com.pawspot.post;
 
 import com.pawspot.image.CloudinaryService;
+import com.pawspot.image.ImageUploadResult;
+import com.pawspot.image.cleanup.ImageDeletionQueueService;
 import com.pawspot.post.mapper.PetPostMapper;
+import com.pawspot.post.request.CreatePetPostRequest;
 import com.pawspot.user.User;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -25,7 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import com.pawspot.image.cleanup.ImageDeletionQueueService;
+import org.springframework.web.multipart.MultipartFile;
 
 class PetPostServiceTest {
 
@@ -44,9 +49,125 @@ class PetPostServiceTest {
     @Mock
     private ImageDeletionQueueService imageDeletionQueueService;
 
+    @Mock
+    private MultipartFile image;
+
+    @Mock
+    private CreatePetPostRequest createRequest;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void shouldNotQueueOrDeleteImageWhenPostCreationSucceeds() {
+        User user = new User();
+        PetPost mappedPost = new PetPost();
+        PetPost savedPost = new PetPost();
+
+        when(cloudinaryService.upload(image)).thenReturn(
+            new ImageUploadResult(
+                "https://example.com/uploaded.jpg",
+                "pawspot/posts/uploaded"
+            )
+        );
+        when(petPostMapper.toEntity(createRequest)).thenReturn(mappedPost);
+        when(petPostRepository.save(mappedPost)).thenReturn(savedPost);
+
+        PetPost result = petPostService.createPost(
+            createRequest,
+            image,
+            user
+        );
+
+        assertSame(savedPost, result);
+        verify(imageDeletionQueueService, never())
+            .enqueueAfterFailedCreation(anyString());
+        verify(cloudinaryService, never()).delete(anyString());
+    }
+
+    @Test
+    void shouldQueueUploadedImageWhenRepositorySaveFails() {
+        User user = new User();
+        PetPost mappedPost = new PetPost();
+        RuntimeException creationFailure =
+            new DataIntegrityViolationException("Database save failed");
+
+        when(cloudinaryService.upload(image)).thenReturn(
+            new ImageUploadResult(
+                "https://example.com/failed.jpg",
+                "pawspot/posts/failed-save"
+            )
+        );
+        when(petPostMapper.toEntity(createRequest)).thenReturn(mappedPost);
+        when(petPostRepository.save(mappedPost)).thenThrow(creationFailure);
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> petPostService.createPost(createRequest, image, user)
+        );
+
+        assertSame(creationFailure, thrown);
+        verify(imageDeletionQueueService)
+            .enqueueAfterFailedCreation("pawspot/posts/failed-save");
+        verify(cloudinaryService, never()).delete(anyString());
+    }
+
+    @Test
+    void shouldQueueUploadedImageWhenMappingFails() {
+        User user = new User();
+        RuntimeException mappingFailure =
+            new IllegalStateException("Mapping failed");
+
+        when(cloudinaryService.upload(image)).thenReturn(
+            new ImageUploadResult(
+                "https://example.com/failed.jpg",
+                "pawspot/posts/failed-mapping"
+            )
+        );
+        when(petPostMapper.toEntity(createRequest)).thenThrow(mappingFailure);
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> petPostService.createPost(createRequest, image, user)
+        );
+
+        assertSame(mappingFailure, thrown);
+        verify(imageDeletionQueueService)
+            .enqueueAfterFailedCreation("pawspot/posts/failed-mapping");
+        verify(petPostRepository, never()).save(any(PetPost.class));
+        verify(cloudinaryService, never()).delete(anyString());
+    }
+
+    @Test
+    void shouldSuppressQueueFailureAndRethrowCreationFailure() {
+        User user = new User();
+        RuntimeException creationFailure =
+            new IllegalStateException("Mapping failed");
+        RuntimeException queueFailure =
+            new IllegalStateException("Queueing failed");
+
+        when(cloudinaryService.upload(image)).thenReturn(
+            new ImageUploadResult(
+                "https://example.com/failed.jpg",
+                "pawspot/posts/queue-failed"
+            )
+        );
+        when(petPostMapper.toEntity(createRequest)).thenThrow(creationFailure);
+        doThrow(queueFailure)
+            .when(imageDeletionQueueService)
+            .enqueueAfterFailedCreation("pawspot/posts/queue-failed");
+
+        RuntimeException thrown = assertThrows(
+            RuntimeException.class,
+            () -> petPostService.createPost(createRequest, image, user)
+        );
+
+        assertSame(creationFailure, thrown);
+        assertEquals(1, thrown.getSuppressed().length);
+        assertSame(queueFailure, thrown.getSuppressed()[0]);
+        verify(cloudinaryService, never()).delete(anyString());
     }
 
     @Test

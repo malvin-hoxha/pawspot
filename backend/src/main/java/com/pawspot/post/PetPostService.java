@@ -47,7 +47,7 @@ public class PetPostService {
     }
 
     public PetPost createPost(CreatePetPostRequest request, MultipartFile image, User user) {
-
+        
         ImageUploadResult uploadResult = cloudinaryService.upload(image);
 
         try {
@@ -60,10 +60,12 @@ public class PetPostService {
             return petPostRepository.save(post);
         } catch (RuntimeException ex) {
             try {
-                cloudinaryService.delete(uploadResult.publicId());
+                imageDeletionQueueService.enqueueAfterFailedCreation(uploadResult.publicId());
             } catch (RuntimeException cleanupEx) {
+                // Preserve the original failure and attach the queueing failure.
                 ex.addSuppressed(cleanupEx);
             }
+
             throw ex;
         }
     }
