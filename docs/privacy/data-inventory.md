@@ -46,6 +46,13 @@ and records decisions required before public launch.
 - Image cleanup is enabled by default, subject to the global scheduling switch and `app.images.cleanup.enabled`.
 - Cloudinary deletion requests include CDN invalidation, but this does not guarantee immediate removal from every cache or backup.
 
+### Failed post creation
+
+- After a successful Cloudinary upload, a mapping or database save failure queues the uploaded public ID for deletion.
+- Failed-creation task insertion uses a new transaction (`REQUIRES_NEW`), so it commits independently of the failed post creation.
+- The existing image deletion worker processes the task and retries failed deletion attempts.
+- If task insertion also fails, the original post-creation exception is preserved and the queueing exception is attached as suppressed.
+
 ## Retention decisions and verification
 
 - Finalize the proposed 30-day retention period for resolved reports before enabling automatic cleanup.
@@ -57,7 +64,7 @@ and records decisions required before public launch.
 
 ## Known deletion gaps
 
-- If post creation fails after an image upload, compensation still calls Cloudinary directly; a failed compensation deletion is not persisted for retry.
+- Failed-post-creation cleanup is not atomic across Cloudinary and PostgreSQL. A process crash before task insertion, or database unavailability preventing insertion, can still leave an orphan image.
 - Clearing a report's user reference does not anonymize its free-text description.
 
 ## Before publication
